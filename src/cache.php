@@ -3,43 +3,50 @@
 declare(strict_types=1);
 
 /**
- * Simple file-based cache for GitHub contribution stats
+ * Caché simple basado en archivos para estadísticas de contribuciones de GitHub.
  *
- * Caches stats for 24 hours to avoid repeated API calls
+ * Guarda las estadísticas durante 24 horas para evitar llamadas repetidas a la API.
  */
 
-// Default cache duration: 24 hours (in seconds)
+// Duración predeterminada de la caché: 24 horas, en segundos.
 define("CACHE_DURATION", 24 * 60 * 60);
 define("CACHE_DIR", __DIR__ . "/../cache");
 
 /**
- * Generate a cache key for a user's request
+ * Genera una clave de caché para la solicitud de un usuario.
  *
- * Uses structured JSON format to prevent hash collisions between different
- * user/options combinations that could produce the same concatenated string.
+ * Utiliza JSON estructurado para evitar colisiones de hash entre distintas
+ * combinaciones de usuario y opciones que pudieran generar la misma cadena
+ * concatenada.
  *
- * @param string $user GitHub username
- * @param array $options Additional options that affect the stats (mode, exclude_days, starting_year, timezone)
- * @return string Cache key (filename-safe)
+ * @param string $user Nombre de usuario de GitHub
+ * @param array $options Opciones adicionales que afectan las estadísticas:
+ *                       mode, exclude_days, starting_year y timezone
+ * @return string Clave de caché segura para usar como nombre de archivo
  */
 function getCacheKey(string $user, array $options = []): string
 {
     ksort($options);
+
     try {
-        $keyData = json_encode(["user" => $user, "options" => $options], JSON_THROW_ON_ERROR);
+        $keyData = json_encode(
+            ["user" => $user, "options" => $options],
+            JSON_THROW_ON_ERROR,
+        );
     } catch (JsonException $e) {
-        // Fallback to simple concatenation if JSON encoding fails
-        error_log("Cache key JSON encoding failed: " . $e->getMessage());
+        // Usa concatenación simple si no se puede codificar JSON.
+        error_log("No se pudo codificar JSON para la clave de caché: " . $e->getMessage());
         $keyData = $user . serialize($options);
     }
+
     return hash("sha256", $keyData);
 }
 
 /**
- * Get the cache file path for a given key
+ * Obtiene la ruta del archivo de caché para una clave determinada.
  *
- * @param string $key Cache key
- * @return string Full path to cache file
+ * @param string $key Clave de caché
+ * @return string Ruta completa del archivo de caché
  */
 function getCacheFilePath(string $key): string
 {
@@ -47,28 +54,32 @@ function getCacheFilePath(string $key): string
 }
 
 /**
- * Ensure the cache directory exists
+ * Garantiza que exista el directorio de caché.
  *
- * @return bool True if directory exists or was created
+ * @return bool True si el directorio ya existe o se creó correctamente
  */
 function ensureCacheDir(): bool
 {
     if (!is_dir(CACHE_DIR)) {
         return mkdir(CACHE_DIR, 0755, true);
     }
+
     return true;
 }
 
 /**
- * Get cached stats if available and not expired
+ * Obtiene estadísticas desde la caché si están disponibles y no han expirado.
  *
- * @param string $user GitHub username
- * @param array $options Additional options
- * @param int $maxAge Maximum age in seconds (default: 24 hours)
- * @return array|null Cached stats array or null if not cached/expired
+ * @param string $user Nombre de usuario de GitHub
+ * @param array $options Opciones adicionales
+ * @param int $maxAge Antigüedad máxima en segundos; 24 horas por defecto
+ * @return array|null Estadísticas almacenadas o null si no existen o expiraron
  */
-function getCachedStats(string $user, array $options = [], int $maxAge = CACHE_DURATION): ?array
-{
+function getCachedStats(
+    string $user,
+    array $options = [],
+    int $maxAge = CACHE_DURATION,
+): ?array {
     $key = getCacheKey($user, $options);
     $filePath = getCacheFilePath($key);
 
@@ -84,6 +95,7 @@ function getCachedStats(string $user, array $options = [], int $maxAge = CACHE_D
     $fileAge = time() - $mtime;
     if ($fileAge > $maxAge) {
         unlink($filePath);
+
         return null;
     }
 
@@ -94,10 +106,12 @@ function getCachedStats(string $user, array $options = [], int $maxAge = CACHE_D
 
     if (!flock($handle, LOCK_SH)) {
         fclose($handle);
+
         return null;
     }
 
     $contents = stream_get_contents($handle);
+
     flock($handle, LOCK_UN);
     fclose($handle);
 
@@ -106,6 +120,7 @@ function getCachedStats(string $user, array $options = [], int $maxAge = CACHE_D
     }
 
     $data = json_decode($contents, true);
+
     if (!is_array($data)) {
         return null;
     }
@@ -114,17 +129,18 @@ function getCachedStats(string $user, array $options = [], int $maxAge = CACHE_D
 }
 
 /**
- * Save stats to cache
+ * Guarda estadísticas en la caché.
  *
- * @param string $user GitHub username
- * @param array $options Additional options
- * @param array $stats Stats array to cache
- * @return bool True if successfully cached
+ * @param string $user Nombre de usuario de GitHub
+ * @param array $options Opciones adicionales
+ * @param array $stats Estadísticas que se almacenarán en caché
+ * @return bool True si se almacenaron correctamente
  */
 function setCachedStats(string $user, array $options, array $stats): bool
 {
     if (!ensureCacheDir()) {
-        error_log("Failed to create cache directory: " . CACHE_DIR);
+        error_log("No se pudo crear el directorio de caché: " . CACHE_DIR);
+
         return false;
     }
 
@@ -132,14 +148,18 @@ function setCachedStats(string $user, array $options, array $stats): bool
     $filePath = getCacheFilePath($key);
 
     $data = json_encode($stats);
+
     if ($data === false) {
-        error_log("Failed to encode stats to JSON for user: " . $user);
+        error_log("No se pudieron codificar las estadísticas como JSON para el usuario: " . $user);
+
         return false;
     }
 
     $result = file_put_contents($filePath, $data, LOCK_EX);
+
     if ($result === false) {
-        error_log("Failed to write cache file: " . $filePath);
+        error_log("No se pudo escribir el archivo de caché: " . $filePath);
+
         return false;
     }
 
@@ -147,10 +167,10 @@ function setCachedStats(string $user, array $options, array $stats): bool
 }
 
 /**
- * Clear all expired cache files
+ * Elimina todos los archivos de caché expirados.
  *
- * @param int $maxAge Maximum age in seconds
- * @return int Number of files deleted
+ * @param int $maxAge Antigüedad máxima permitida en segundos
+ * @return int Cantidad de archivos eliminados
  */
 function clearExpiredCache(int $maxAge = CACHE_DURATION): int
 {
@@ -167,10 +187,13 @@ function clearExpiredCache(int $maxAge = CACHE_DURATION): int
 
     foreach ($files as $file) {
         $mtime = filemtime($file);
+
         if ($mtime === false) {
             continue;
         }
+
         $fileAge = time() - $mtime;
+
         if ($fileAge > $maxAge) {
             if (unlink($file)) {
                 $deleted++;
@@ -182,15 +205,17 @@ function clearExpiredCache(int $maxAge = CACHE_DURATION): int
 }
 
 /**
- * Clear cache for a specific user
+ * Elimina la caché para un usuario específico.
  *
- * Note: This function only clears the cache for the user with empty/default options.
- * Cache entries with non-empty options (starting_year, mode, exclude_days, timezone) will NOT
- * be cleared. This is a limitation of the hash-based cache key system - we cannot
- * enumerate all possible option combinations without storing additional metadata.
+ * Nota: esta función solo elimina la entrada de caché del usuario usando
+ * opciones vacías o predeterminadas. Las entradas con opciones no vacías,
+ * como starting_year, mode, exclude_days o timezone, no se eliminarán.
  *
- * @param string $user GitHub username
- * @return bool True if cache was cleared (or didn't exist)
+ * Esta limitación se debe al uso de claves hash: no es posible enumerar todas
+ * las combinaciones potenciales de opciones sin guardar metadatos adicionales.
+ *
+ * @param string $user Nombre de usuario de GitHub
+ * @return bool True si se eliminó la caché o si no existía
  */
 function clearUserCache(string $user): bool
 {
