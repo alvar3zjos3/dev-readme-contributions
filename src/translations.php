@@ -1,39 +1,64 @@
 <?php
 
+declare(strict_types=1);
+
 /**
- * Locales
- * -------
- * For a list of supported locale codes, see https://gist.github.com/DenverCoder1/f61147ba26bfcf7c3bf605af7d3382d5
+ * Idiomas disponibles
+ * -------------------
+ * Para consultar los códigos regionales e idiomas compatibles, revisa:
+ * https://gist.github.com/DenverCoder1/f61147ba26bfcf7c3bf605af7d3382d5
  *
- * Date Format
- * -----------
- * If the default date format for the locale displays correctly, you should omit the date_format parameter.
- * Supplying a date format is optional and will be used instead of the default locale date format.
+ * Formato de fecha
+ * ----------------
+ * Si el formato predeterminado del idioma se muestra correctamente, no es
+ * necesario indicar el parámetro `date_format`.
  *
- * Different year   Same year   Format string
- * --------------   ---------   -------------
- * 10/8/2016        10/8        j/n[/Y]
- * 8/10/2016        8/10        n/j[/Y]
- * 2016.8.10        8.10        [Y.]n.j
+ * El parámetro `date_format` es opcional y sustituye el formato regional
+ * predeterminado. Los caracteres entre corchetes se omiten cuando el año de
+ * la contribución coincide con el año actual.
  *
- * For info on valid date_format strings, see https://github.com/DenverCoder1/github-readme-streak-stats#date-formats
+ * Año diferente    Mismo año    Cadena de formato
+ * --------------   ---------    -----------------
+ * 10/8/2016        10/8         j/n[/Y]
+ * 8/10/2016        8/10         n/j[/Y]
+ * 2016.8.10        8.10         [Y.]n.j
  *
- * Right-to-Left Language Support
+ * Consulta los formatos válidos de la función date() de PHP:
+ * https://www.php.net/manual/es/datetime.format.php
+ *
+ * Idiomas de derecha a izquierda
  * ------------------------------
- * To enable right-to-left language support, add `"rtl" => true` to the locale array (see "he" for an example).
+ * Para activar la escritura de derecha a izquierda, añade `"rtl" => true`
+ * al array del idioma. Consulta el idioma `he` como ejemplo.
  *
- * Comma Separator
- * ---------------
- * To change the comma separator in the enumeration of excluded days, add `"comma_separator" => ", "` to the locale array with the desired separator as the value.
+ * Separador de comas
+ * ------------------
+ * Para cambiar el separador al enumerar días excluidos, añade
+ * `"comma_separator" => ", "` al idioma correspondiente y establece el
+ * valor que necesites.
  *
- * Aliases
- * -------
- * To add an alias for a locale, add the alias as a key to the locale array with the locale it should redirect to as the value.
- * For example, if "zh" is an alias for "zh_Hans", then `"zh" => "zh_Hans"` would be added to the locale array.
+ * Alias
+ * -----
+ * Para crear un alias de idioma, añade el alias como clave y el locale de
+ * destino como valor.
+ *
+ * Ejemplo: si `zh` debe ser un alias de `zh_Hans`, añade:
+ *
+ * `"zh" => "zh_Hans",`
  */
 
 return [
-    // "en" is the default locale
+    // Español: idioma predeterminado de dev-readme-contributions.
+    "es" => [
+        "Total Contributions" => "Contribuciones totales",
+        "Current Streak" => "Racha actual",
+        "Longest Streak" => "Racha más larga",
+        "Week Streak" => "Racha semanal",
+        "Longest Week Streak" => "Racha semanal más larga",
+        "Present" => "Actualidad",
+        "Excluding {days}" => "Excluyendo {days}",
+],
+    // Inglés. Se mantiene para usuarios que soliciten ?locale=en.
     "en" => [
         "Total Contributions" => "Total Contributions",
         "Current Streak" => "Current Streak",
@@ -143,15 +168,6 @@ return [
         "Longest Week Streak" => "Μεγαλύτερη Εβδομαδιαία Σειρά",
         "Present" => "Σήμερα",
         "Excluding {days}" => "Εξαιρούνται {days}",
-    ],
-    "es" => [
-        "Total Contributions" => "Contribuciones Totales",
-        "Current Streak" => "Racha Actual",
-        "Longest Streak" => "Racha Más Larga",
-        "Week Streak" => "Racha Semanal",
-        "Longest Week Streak" => "Racha Semanal Más Larga",
-        "Present" => "Presente",
-        "Excluding {days}" => "Excluyendo {days}",
     ],
     "et" => [
         "Total Contributions" => "Panuseid kokku",
