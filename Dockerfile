@@ -1,67 +1,78 @@
-# Use PHP 8.3 (8.4 not supported yet)
-FROM php:8.3-apache@sha256:6be4ef702b2dd05352f7e5fe14667696a4ad091c9d2ad9083becbee4300dc3b1
+# syntax=docker/dockerfile:1
 
-# Install system dependencies and PHP extensions in one layer
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    unzip \
-    libicu-dev \
-    inkscape \
-    fonts-dejavu-core \
-    curl \
+# Imagen base con PHP 8.3 y Apache.
+# PHP 8.4 no se utiliza hasta que todas las dependencias del proyecto sean compatibles.
+FROM php:8.3-apache
+
+# Instala las dependencias necesarias para ejecutar la aplicación y generar PNG.
+# Inkscape se utiliza únicamente para la salida type=png; SVG y JSON funcionan igualmente.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        curl \
+        fonts-dejavu-core \
+        git \
+        inkscape \
+        libicu-dev \
+        unzip \
     && docker-php-ext-configure intl \
-    && docker-php-ext-install intl \
+    && docker-php-ext-install -j"$(nproc)" intl \
+    && apt-get purge -y --auto-remove libicu-dev git unzip \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Composer
-COPY --from=composer/composer:latest-bin@sha256:c9bda63056674836406cacfbbdd8ef770fb4692ac419c967034225213c64e11b /composer /usr/bin/composer
+# Obtiene Composer desde la imagen oficial, sin instalarlo manualmente.
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Set working directory
+# Directorio de trabajo de la aplicación.
 WORKDIR /var/www/html
 
-# Copy composer files and install dependencies
+# Instala primero las dependencias para aprovechar la caché de capas de Docker.
 COPY composer.json composer.lock ./
+RUN composer install \
+    --no-dev \
+    --no-interaction \
+    --no-progress \
+    --prefer-dist \
+    --optimize-autoloader
+
+# Copia únicamente los archivos necesarios en la imagen de producción.
 COPY src/ ./src/
-RUN composer install --no-dev --optimize-autoloader --no-scripts
 
-# Configure Apache to serve from src/ directory and pass environment variables
-RUN a2enmod rewrite headers && \
-    echo 'ServerTokens Prod\n\
-    ServerSignature Off\n\
-    PassEnv TOKEN\n\
-    PassEnv WHITELIST\n\
-    <VirtualHost *:80>\n\
-    ServerAdmin webmaster@localhost\n\
-    DocumentRoot /var/www/html/src\n\
-    <Directory /var/www/html/src>\n\
-    Options -Indexes\n\
-    AllowOverride None\n\
-    Require all granted\n\
-    Header always set Access-Control-Allow-Origin "*"\n\
-    Header always set Content-Type "image/svg+xml" "expr=%{REQUEST_URI} =~ m#\\.svg$#i"\n\
-    Header always set Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'; img-src data:;" "expr=%{REQUEST_URI} =~ m#\\.svg$#i"\n\
-    Header always set Referrer-Policy "no-referrer-when-downgrade"\n\
-    Header always set X-Content-Type-Options "nosniff"\n\
-    </Directory>\n\
-    ErrorLog ${APACHE_LOG_DIR}/error.log\n\
-    CustomLog ${APACHE_LOG_DIR}/access.log combined\n\
-    </VirtualHost>' > /etc/apache2/sites-available/000-default.conf
+# Configura Apache para servir el endpoint PHP desde src/.
+# TOKEN y WHITELIST se reciben al iniciar el contenedor mediante docker run.
+RUN a2enmod headers rewrite \
+    && printf '%s\n' \
+        '<VirtualHost *:80>' \
+        '    ServerName localhost' \
+        '    ServerTokens Prod' \
+        '    ServerSignature Off' \
+        '    DocumentRoot /var/www/html/src' \
+        '    PassEnv TOKEN' \
+        '    PassEnv WHITELIST' \
+        '    <Directory /var/www/html/src>' \
+        '        Options -Indexes' \
+        '        AllowOverride None' \
+        '        Require all granted' \
+        '        Header always set Access-Control-Allow-Origin "*"' \
+        '        Header always set Content-Security-Policy "default-src '\''none'\''; style-src '\''unsafe-inline'\''; img-src data:;"' \
+        '        Header always set Referrer-Policy "no-referrer-when-downgrade"' \
+        '        Header always set X-Content-Type-Options "nosniff"' \
+        '    </Directory>' \
+        '    ErrorLog ${APACHE_LOG_DIR}/error.log' \
+        '    CustomLog ${APACHE_LOG_DIR}/access.log combined' \
+        '</VirtualHost>' \
+        > /etc/apache2/sites-available/000-default.conf
 
-RUN mkdir -p /var/www/html/cache
+# Directorio de caché escribible por Apache.
+RUN mkdir -p /var/www/html/cache \
+    && chown -R www-data:www-data /var/www/html \
+    && chmod 775 /var/www/html/cache
 
-# Set secure permissions (cache dir needs write access for www-data)
-RUN chown -R www-data:www-data /var/www/html && \
-    find /var/www/html -type d -exec chmod 755 {} \; && \
-    find /var/www/html -type f -exec chmod 644 {} \; && \
-    chmod 775 /var/www/html/cache
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost/demo/ || exit 1
-
-# Expose port
+# El contenedor expone Apache en el puerto 80.
 EXPOSE 80
 
-# Start Apache
+# Comprueba que Apache puede responder durante la ejecución del contenedor.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl --fail --silent http://localhost/ || exit 1
+
 CMD ["apache2-foreground"]
