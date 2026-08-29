@@ -18,7 +18,7 @@ const preview = {
   /**
    * Valores predeterminados de la API y de la interfaz.
    *
-   * Los parámetros con estos valores se omiten de las URLs generadas. El
+   * Los parámetros con estos valores se omiten de las URL generadas. El
    * backend aplica español y Europe/Madrid si no se incluyen explícitamente.
    */
   defaults: {
@@ -49,10 +49,9 @@ const preview = {
     const params = this.getParams();
     const query = this.createQuery(params);
     const cardUrl = this.createCardUrl(query);
-    
     const previewUrl = query
-  ? `/generator/preview.php?${query}`
-  : "/generator/preview.php";
+      ? `/generator/preview.php?${query}`
+      : "/generator/preview.php";
 
     if (params.type === "json") {
       this.renderJsonPreview(cardUrl, previewUrl);
@@ -96,21 +95,21 @@ const preview = {
    * @returns {string} Cadena de consulta URL codificada
    */
   createQuery(params) {
-  return Object.entries(params)
-    .filter(([key, value]) => {
-      // Nunca incluye parámetros vacíos, por ejemplo timezone=.
-      if (value === "") {
-        return false;
-      }
+    return Object.entries(params)
+      .filter(([key, value]) => {
+        // Nunca incluye parámetros vacíos, por ejemplo timezone=.
+        if (value === "") {
+          return false;
+        }
 
-      // Omite los valores predeterminados, como locale=es.
-      return value !== this.defaults[key];
-    })
-    .map(([key, value]) => {
-      return `${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
-    })
-    .join("&");
-},
+        // Omite los valores predeterminados, como locale=es.
+        return value !== this.defaults[key];
+      })
+      .map(([key, value]) => {
+        return `${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+      })
+      .join("&");
+  },
 
   /**
    * Construye la URL pública de la tarjeta.
@@ -169,7 +168,7 @@ const preview = {
    */
   renderJsonPreview(cardUrl, previewUrl) {
     const jsonOutput = document.querySelector(".output .json pre");
-    const jsonCode = document.querySelector(".json code");
+    const jsonCode = document.querySelector(".json-output code");
 
     if (!jsonOutput || !jsonCode) {
       return;
@@ -296,6 +295,25 @@ const preview = {
   },
 
   /**
+   * Devuelve el texto visible de una propiedad de color a partir del
+   * option correspondiente en #properties.
+   *
+   * Se reutiliza el texto que ya existe en el HTML (index.php); este
+   * archivo no mantiene ningún mapa de traducciones duplicado.
+   *
+   * @param {string} propertyName Clave técnica de la propiedad
+   * @returns {string} Texto visible o la propia clave si no se encuentra
+   */
+  getColorPropertyLabel(propertyName) {
+    const select = document.querySelector("#properties");
+    const option = Array.from(select?.options ?? []).find(
+      (item) => item.value === propertyName,
+    );
+
+    return option?.textContent?.trim() || propertyName;
+  },
+
+  /**
    * Añade una propiedad de color a la personalización avanzada.
    *
    * @param {string} [property] Propiedad a añadir
@@ -305,7 +323,7 @@ const preview = {
     const select = document.querySelector("#properties");
     const propertyName = property || select?.value;
 
-    if (!select || !propertyName || select.disabled || this.hasAdvancedProperty(propertyName)) {
+    if (!select || !propertyName || this.hasAdvancedProperty(propertyName)) {
       return;
     }
 
@@ -356,6 +374,12 @@ const preview = {
   /**
    * Selecciona la primera propiedad que sigue disponible.
    *
+   * Se ejecuta cada vez que se añade una propiedad. Cuando se reconstruyen
+   * varias propiedades seguidas desde la URL (ver updateFormInputs), el
+   * resultado final de esta función es simplemente informativo: el select
+   * queda apuntando a la primera opción libre en orden del propio <select>,
+   * nunca a una propiedad ya usada.
+   *
    * @param {HTMLSelectElement} select Selector de propiedades
    */
   selectFirstAvailableProperty(select) {
@@ -385,7 +409,7 @@ const preview = {
 
     const label = document.createElement("span");
     label.id = "background-label";
-    label.innerText = "Fondo";
+    label.innerText = this.getColorPropertyLabel(propertyName);
     label.setAttribute("data-property", propertyName);
 
     const wrapper = document.createElement("span");
@@ -437,21 +461,27 @@ const preview = {
   /**
    * Añade un control de color sólido.
    *
+   * El texto de la etiqueta se obtiene directamente del option
+   * seleccionado en #properties; la clave técnica se conserva solo
+   * como value/name del input.
+   *
    * @param {Element} parent Contenedor de propiedades
    * @param {string} propertyName Nombre de la propiedad
    * @param {string} value Valor inicial
    */
   addColorProperty(parent, propertyName, value) {
+    const propertyLabel = this.getColorPropertyLabel(propertyName);
+
     const label = document.createElement("label");
     label.htmlFor = propertyName;
-    label.innerText = propertyName;
+    label.innerText = propertyLabel;
     label.setAttribute("data-property", propertyName);
 
     const input = this.createColorInput(
       propertyName,
       propertyName,
       value,
-      `Color para ${propertyName}`,
+      `Color para ${propertyLabel}`,
     );
 
     input.setAttribute("data-property", propertyName);
@@ -497,6 +527,8 @@ const preview = {
    * @param {string} propertyName Propiedad asociada
    */
   addRemovalButton(parent, propertyName) {
+    const propertyLabel = this.getColorPropertyLabel(propertyName);
+
     const button = document.createElement("button");
 
     button.className = "minus btn";
@@ -505,8 +537,9 @@ const preview = {
     button.setAttribute("data-property", propertyName);
     button.setAttribute(
       "aria-label",
-      `Eliminar la propiedad ${propertyName}`,
+      `Eliminar la propiedad ${propertyLabel}`,
     );
+    button.title = `Eliminar ${propertyLabel}`;
 
     button.addEventListener("click", () => this.removeProperty(propertyName));
     parent.append(button);
@@ -536,9 +569,9 @@ const preview = {
     if (option) {
       option.disabled = false;
       select.disabled = false;
-      select.value = option.value;
     }
 
+    this.selectFirstAvailableProperty(select);
     this.update();
   },
 
@@ -677,12 +710,32 @@ const preview = {
   /**
    * Aplica los parámetros de la URL actual al formulario.
    *
+   * Reconstruye las propiedades avanzadas de color (incluyendo fondos
+   * sólidos y gradientes) a partir de la URL, sin perder ningún valor al
+   * pulsar "Abrir enlace de la tarjeta" y recargar la página.
+   *
+   * Las propiedades se procesan siguiendo el mismo orden en que aparecen
+   * las opciones dentro de #properties (background primero, tal como está
+   * definido en themes.php/index.php), en lugar del orden de llegada en la
+   * URL. Así el selector superior queda siempre en un estado predecible.
+   *
    * @param {URLSearchParams} [searchParams] Parámetros de URL
    */
   updateFormInputs(searchParams = new URLSearchParams(window.location.search)) {
-    const backgroundValues = searchParams.getAll("background");
+    const colorPropertySelect = document.querySelector("#properties");
+    const orderedColorProperties = colorPropertySelect
+      ? Array.from(colorPropertySelect.options).map((option) => option.value)
+      : [];
+    const knownColorProperties = new Set(orderedColorProperties);
 
-    if (backgroundValues.length > 1) {
+    const backgroundValue = searchParams.get("background");
+
+    /*
+     * Un gradiente se guarda como un único parámetro con tres partes
+     * separadas por coma: ángulo, primer color y segundo color. Por
+     * ejemplo: background=45,1544EB,C2EB07
+     */
+    if (backgroundValue !== null && backgroundValue.split(",").length === 3) {
       const gradient = document.querySelector("#background-type-gradient");
 
       if (gradient) {
@@ -690,39 +743,42 @@ const preview = {
       }
     }
 
-    const advancedKeys = new Set();
+    const advancedValues = new Map();
 
     searchParams.forEach((value, key) => {
+      /*
+       * background y las propiedades disponibles en el selector #properties
+       * son colores avanzados. Se guardan aparte para reconstruir sus
+       * controles dinámicos después de aplicar los campos normales, y en
+       * el orden fijo del <select>, no en el orden de la URL.
+       */
+      if (key === "background" || knownColorProperties.has(key)) {
+        advancedValues.set(key, value);
+        return;
+      }
+
       const input = document.querySelector(
         `[name="${CSS.escape(key)}"]`,
       );
 
       if (input) {
         input.value = value;
-      } else if (key !== "background") {
-        advancedKeys.add(key);
       }
     });
 
-    advancedKeys.forEach((key) => {
+    if (advancedValues.size > 0) {
       const advanced = document.querySelector("details.advanced");
 
       if (advanced) {
         advanced.open = true;
       }
-
-      this.addProperty(key, searchParams.getAll(key).join(","));
-    });
-
-    if (backgroundValues.length > 0) {
-      const advanced = document.querySelector("details.advanced");
-
-      if (advanced) {
-        advanced.open = true;
-      }
-
-      this.addProperty("background", backgroundValues.join(","));
     }
+
+    orderedColorProperties
+      .filter((property) => advancedValues.has(property))
+      .forEach((property) => {
+        this.addProperty(property, advancedValues.get(property));
+      });
 
     /*
      * Si sections no viene en la URL, se conserva el estado HTML por defecto:
@@ -775,7 +831,7 @@ const clipboard = {
       ? ".md code"
       : button.classList.contains("copy-html")
         ? ".html code"
-        : ".json code";
+        : ".json-output code";
 
     const text = document.querySelector(selector)?.innerText ?? "";
 

@@ -208,7 +208,7 @@ function getThemeDataAttributes(array $theme): string
                     <option value="true">Ocultar</option>
                 </select>
 
-                <label for="border-radius">Radio del borde</label>
+                <label for="border-radius">Redondeo de las esquinas</label>
 
                 <input
                     class="param"
@@ -276,7 +276,7 @@ function getThemeDataAttributes(array $theme): string
                     <option value="[Y.]n.j">2016.8.10</option>
                 </select>
 
-                <label for="mode">Modo de racha</label>
+                <label for="mode">Cálculo de rachas</label>
 
                 <select class="param" id="mode" name="mode">
                     <option value="daily">Diario</option>
@@ -320,7 +320,7 @@ function getThemeDataAttributes(array $theme): string
                     >
                 </div>
 
-                <span id="show-sections-label">Métricas visibles</span>
+                <span id="show-sections-label">Estadísticas visibles</span>
 
                 <div
                     class="checkbox-buttons sections"
@@ -472,7 +472,7 @@ function getThemeDataAttributes(array $theme): string
                         onclick="preview.removeAllProperties()"
                         disabled
                     >
-                        Restablecer colores
+                        Restablecer personalización
                     </button>
 
                     <textarea
@@ -483,7 +483,7 @@ function getThemeDataAttributes(array $theme): string
                     ></textarea>
                 </details>
 
-                <button class="btn" type="submit">Abrir enlace permanente</button>
+                <button class="btn" type="submit">Abrir enlace de la tarjeta</button>
             </form>
         </section>
 
@@ -558,7 +558,7 @@ function getThemeDataAttributes(array $theme): string
                         onmouseout="tooltip.reset(this)"
                         disabled
                     >
-                        Copiar URL JSON
+                        Copiar enlace JSON
                     </button>
                 </div>
             </div>
@@ -594,10 +594,10 @@ function getThemeDataAttributes(array $theme): string
         type="button"
         class="darkmode"
         onclick="toggleTheme()"
-        title="Cambiar entre modo claro y oscuro"
-        aria-label="Cambiar entre modo claro y oscuro"
+        title="<?= $darkmode === "on" ? "Cambiar al modo claro" : "Cambiar al modo oscuro" ?>"
+        aria-label="<?= $darkmode === "on" ? "Cambiar al modo claro" : "Cambiar al modo oscuro" ?>"
     >
-        <span id="darkmode-icon"><?= $darkmode === "on" ? "🌞" : "🌙" ?></span>
+        <span id="darkmode-icon" aria-hidden="true"><?= $darkmode === "on" ? "🌞" : "🌙" ?></span>
     </button>
 </body>
 

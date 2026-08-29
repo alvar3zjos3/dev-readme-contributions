@@ -9,10 +9,10 @@ require_once "../stats.php";
 require_once "../cache.php";
 
 /**
- * Obtiene un parámetro de consulta como texto seguro.
+ * Obtiene un parámetro GET como texto normalizado.
  *
- * Si el parámetro no existe, es un array o no es una cadena, devuelve el
- * valor predeterminado indicado.
+ * Si el parámetro no existe, contiene un array o no es una cadena, devuelve
+ * el valor predeterminado indicado.
  *
  * @param string $name Nombre del parámetro GET
  * @param string $default Valor predeterminado
@@ -26,9 +26,9 @@ function getQueryString(string $name, string $default = ""): string
 }
 
 /**
- * Obtiene y valida el año inicial opcional para calcular contribuciones.
+ * Obtiene y valida el año inicial opcional de las contribuciones.
  *
- * @return int|null Año inicial válido o null si no se indica
+ * @return int|null Año inicial válido o null si no se indicó
  *
  * @throws InvalidArgumentException Si el año es inválido
  */
@@ -63,8 +63,8 @@ function getStartingYear(): ?int
 /**
  * Devuelve una zona horaria IANA válida.
  *
- * Si el parámetro timezone no se incluye o llega vacío, la aplicación usa
- * Europe/Madrid internamente sin reflejarlo en la URL.
+ * Si timezone no llega o llega vacío, se emplea Europe/Madrid internamente.
+ * El valor predeterminado no necesita estar presente en la URL.
  *
  * @param string $requestedTimezone Zona horaria enviada por el cliente
  * @return string Zona horaria efectiva
@@ -90,15 +90,15 @@ function getEffectiveTimezone(string $requestedTimezone): string
 }
 
 /**
- * Valida el formato de un usuario de GitHub.
+ * Valida el formato de un nombre de usuario de GitHub.
  *
- * GitHub permite entre 1 y 39 caracteres: letras, números o guiones. Un
- * nombre de usuario no puede comenzar ni terminar con un guion.
+ * Los usuarios válidos contienen de 1 a 39 caracteres alfanuméricos o
+ * guiones; no pueden empezar ni terminar con un guion.
  *
  * @param string $user Usuario de GitHub
  * @return void
  *
- * @throws InvalidArgumentException Si el usuario está vacío o es inválido
+ * @throws InvalidArgumentException Si el usuario es inválido
  */
 function validateGitHubUsername(string $user): void
 {
@@ -118,14 +118,14 @@ function validateGitHubUsername(string $user): void
 }
 
 /**
- * Obtiene estadísticas reales desde caché o desde la API GraphQL de GitHub.
+ * Obtiene estadísticas de contribuciones reales desde caché o GitHub.
  *
  * @param string $user Usuario de GitHub
- * @param string $mode Modo de cálculo: daily o weekly
- * @param array<string> $excludedDays Días excluidos para modo diario
+ * @param string $mode Modo: daily o weekly
+ * @param array<string> $excludedDays Días excluidos en modo diario
  * @param string $timezone Zona horaria IANA efectiva
  * @param int|null $startingYear Año inicial opcional
- * @return array<string,mixed> Estadísticas preparadas para renderizar
+ * @return array<string,mixed> Estadísticas listas para renderizar
  */
 function getRealContributionStats(
     string $user,
@@ -135,13 +135,14 @@ function getRealContributionStats(
     ?int $startingYear,
 ): array {
     /*
-     * Se guarda la zona efectiva en caché, no el valor crudo de GET. Así,
-     * una petición sin timezone y otra con timezone=Europe/Madrid usan la
-     * misma clave de caché.
+     * Usa la zona efectiva para que una solicitud sin timezone y otra con
+     * timezone=Europe/Madrid compartan la misma entrada de caché.
      */
     $cacheOptions = [
         "mode" => $mode,
-        "exclude_days" => $mode === "daily" ? implode(",", $excludedDays) : "",
+        "exclude_days" => $mode === "daily"
+            ? implode(",", $excludedDays)
+            : "",
         "starting_year" => $startingYear,
         "timezone" => $timezone,
     ];
@@ -166,11 +167,21 @@ function getRealContributionStats(
     return $stats;
 }
 
+/**
+ * Convierte un código de excepción en un código HTTP seguro.
+ *
+ * @param int $code Código original
+ * @return int Código HTTP válido
+ */
+function getHttpErrorCode(int $code): int
+{
+    return $code >= 400 && $code <= 599 ? $code : 500;
+}
+
 try {
     $user = getQueryString("user");
     $mode = getQueryString("mode", "daily");
-    $requestedTimezone = getQueryString("timezone");
-    $timezone = getEffectiveTimezone($requestedTimezone);
+    $timezone = getEffectiveTimezone(getQueryString("timezone"));
     $startingYear = getStartingYear();
     $excludedDays = normalizeDays(
         explode(",", getQueryString("exclude_days")),
@@ -186,12 +197,12 @@ try {
     validateGitHubUsername($user);
 
     /*
-     * Se establece solo después de validar. Esto garantiza que date(), time(),
-     * DateTime y las funciones semanales usen la zona de cálculo efectiva.
+     * Configura la zona solo tras validarla. Esto asegura que las funciones
+     * date(), DateTime y los cálculos semanales usan la zona solicitada.
      */
     date_default_timezone_set($timezone);
 
-    // Los días excluidos solo se aplican al cálculo diario.
+    // Los días excluidos no forman parte del cálculo semanal.
     if ($mode === "weekly") {
         $excludedDays = [];
     }
@@ -205,18 +216,14 @@ try {
     );
 
     /*
-     * renderOutput() decide automáticamente el Content-Type:
-     * - SVG: image/svg+xml
-     * - PNG: image/png
-     * - JSON: application/json
+     * renderOutput() establece el tipo de contenido apropiado:
+     * SVG:  image/svg+xml
+     * PNG:  image/png
+     * JSON: application/json
      */
     renderOutput($stats);
 } catch (InvalidArgumentException | AssertionError $error) {
-    $errorCode = $error->getCode();
-
-    if (!is_int($errorCode) || $errorCode < 400 || $errorCode > 599) {
-        $errorCode = 500;
-    }
+    $errorCode = getHttpErrorCode((int) $error->getCode());
 
     error_log("Error {$errorCode}: {$error->getMessage()}");
 
@@ -225,4 +232,16 @@ try {
     }
 
     renderOutput($error->getMessage(), $errorCode);
+} catch (Throwable $error) {
+    /*
+     * No expone detalles técnicos del servidor al usuario. La traza completa
+     * queda disponible únicamente en el log del proceso PHP.
+     */
+    error_log("Error inesperado: {$error->getMessage()}");
+    error_log($error->getTraceAsString());
+
+    renderOutput(
+        "No se pudieron generar las estadísticas en este momento.",
+        500,
+    );
 }
