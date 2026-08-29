@@ -1,26 +1,24 @@
 {
-  "name": "denvercoder1/github-readme-streak-stats",
-  "description": "🔥 Stay motivated and show off your contribution streak! 🌟 Display your total contributions, current streak, and longest streak on your GitHub profile README.",
+  "name": "alvar3zjos3/dev-readme-contributions",
+  "description": "🔥 Genera tarjetas dinámicas de contribuciones, racha actual y racha más larga para README de GitHub. Parte de dev-readme-stats.",
+  "type": "project",
+  "license": "MIT",
+  "version": "1.7.0",
+  "homepage": "https://github.com/alvar3zjos3/dev-readme-contributions",
   "keywords": [
     "github",
-    "dynamic",
+    "github-readme",
     "readme",
     "contributions",
     "streak",
+    "streak-stats",
+    "dynamic",
+    "svg",
     "stats"
   ],
-  "license": "MIT",
-  "version": "1.7.0",
-  "homepage": "https://github.com/DenverCoder1/github-readme-streak-stats",
-  "repositories": [
-      {
-          "type": "vcs",
-          "url": "https://github.com/DenverCoder1/github-readme-streak-stats"
-      }
-  ],
   "support": {
-    "issues": "https://github.com/DenverCoder1/github-readme-streak-stats/issues",
-    "source": "https://github.com/DenverCoder1/github-readme-streak-stats"
+    "issues": "https://github.com/alvar3zjos3/dev-readme-contributions/issues",
+    "source": "https://github.com/alvar3zjos3/dev-readme-contributions"
   },
   "autoload": {
     "classmap": [
@@ -28,7 +26,8 @@
     ]
   },
   "require": {
-    "php": "^8.2",
+    "php": "^8.3",
+    "ext-curl": "*",
     "ext-intl": "*",
     "vlucas/phpdotenv": "^5.3"
   },
@@ -38,10 +37,21 @@
   "scripts": {
     "start": [
       "Composer\\Config::disableProcessTimeout",
-      "php -S localhost:8000 -t src"
+      "@php -S localhost:8000 -t src"
     ],
-    "test": "./vendor/bin/phpunit --testdox tests",
-    "lint": "npx prettier --check *.md **/*.{php,md,js,css}",
-    "lint-fix": "npx prettier --write *.md **/*.{php,md,js,css}"
-  }
+    "test": "@php ./vendor/bin/phpunit --testdox tests",
+    "lint": "npx prettier --check \"*.md\" \"**/*.{php,md,js,css,json,yml,yaml}\"",
+    "lint-fix": "npx prettier --write \"*.md\" \"**/*.{php,md,js,css,json,yml,yaml}\"",
+    "validate": [
+      "@composer validate --strict",
+      "@composer test",
+      "@composer lint"
+    ]
+  },
+  "config": {
+    "sort-packages": true,
+    "optimize-autoloader": true
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
 }
