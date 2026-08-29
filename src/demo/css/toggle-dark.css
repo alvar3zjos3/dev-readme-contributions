@@ -1,33 +1,76 @@
-a.darkmode {
+.darkmode {
   position: fixed;
-  top: 2em;
-  right: 2em;
-  color: var(--text);
-  background: var(--background);
-  height: 3em;
-  width: 3em;
-  display: flex;
+  z-index: 100;
+  top: 1.5rem;
+  right: 1.5rem;
+
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
+
+  width: 3rem;
+  height: 3rem;
+  padding: 0;
+
   border: 2px solid var(--border);
+  border-radius: 50%;
+  background: var(--card-background);
   box-shadow:
     0 0 3px rgb(0 0 0 / 12%),
     0 1px 2px rgb(0 0 0 / 24%);
-  transition: 0.2s ease-in box-shadow;
+
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  line-height: 1;
   text-decoration: none;
+
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
 }
 
-a.darkmode:hover {
+.darkmode:hover {
   box-shadow:
     0 0 6px rgb(0 0 0 / 16%),
     0 3px 6px rgb(0 0 0 / 23%);
+  transform: translateY(-1px);
 }
 
-@media only screen and (max-width: 600px) {
-  a.darkmode {
-    top: unset;
-    bottom: 1em;
-    right: 1em;
+.darkmode:focus-visible {
+  outline: 3px solid var(--blue-light);
+  outline-offset: 3px;
+}
+
+.darkmode:active {
+  transform: translateY(0);
+  box-shadow:
+    0 0 2px rgb(0 0 0 / 12%),
+    0 1px 2px rgb(0 0 0 / 18%);
+}
+
+.darkmode #darkmode-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+@media only screen and (max-width: 640px) {
+  .darkmode {
+    top: auto;
+    right: 1rem;
+    bottom: 1rem;
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .darkmode {
+    transition: none;
   }
 }

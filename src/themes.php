@@ -3,19 +3,6 @@
 // mapping of theme colors given a theme name
 return [
     "default" => [
-        "background" => "#FFFEFE",
-        "border" => "#E4E2E2",
-        "stroke" => "#E4E2E2",
-        "ring" => "#FB8C00",
-        "fire" => "#FB8C00",
-        "currStreakNum" => "#151515",
-        "sideNums" => "#151515",
-        "currStreakLabel" => "#FB8C00",
-        "sideLabels" => "#151515",
-        "dates" => "#464646",
-        "excludeDaysLabel" => "#464646",
-    ],
-    "dark" => [
         "background" => "#151515",
         "border" => "#E4E2E2",
         "stroke" => "#E4E2E2",
@@ -27,6 +14,19 @@ return [
         "sideLabels" => "#FEFEFE",
         "dates" => "#9E9E9E",
         "excludeDaysLabel" => "#9E9E9E",
+    ],
+    "white" => [
+        "background" => "#FFFEFE",
+        "border" => "#E4E2E2",
+        "stroke" => "#E4E2E2",
+        "ring" => "#FB8C00",
+        "fire" => "#FB8C00",
+        "currStreakNum" => "#151515",
+        "sideNums" => "#151515",
+        "currStreakLabel" => "#FB8C00",
+        "sideLabels" => "#151515",
+        "dates" => "#464646",
+        "excludeDaysLabel" => "#464646",
     ],
     "highcontrast" => [
         "background" => "#000000",
