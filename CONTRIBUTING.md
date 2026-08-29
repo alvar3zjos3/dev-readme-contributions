@@ -1,188 +1,493 @@
-## Contributing Guidelines
+# Guía de contribución
 
-Contributions are welcome! Feel free to open an issue or submit a pull request if you have a way to improve this project.
+¡Las contribuciones son bienvenidas! Puedes abrir un issue para informar de un error, proponer una mejora o realizar una pregunta técnica. Si quieres aportar código, documentación, traducciones, temas, pruebas o mejoras de despliegue, envía un pull request.
 
-Make sure your request is meaningful and you have tested the app locally before submitting a pull request.
+`dev-readme-contributions` forma parte del ecosistema de [dev-readme-stats](https://github.com/alvar3zjos3/dev-readme-stats). Antes de enviar cambios, procura que la propuesta sea útil, esté centrada en un objetivo claro y haya sido probada de forma local.
 
-This documentation contains a set of guidelines to help you during the contribution process.
+## Contenido
 
-### Need some help regarding the basics?
+- [Guía de contribución](#guía-de-contribución)
+  - [Contenido](#contenido)
+  - [Antes de empezar](#antes-de-empezar)
+  - [Alcance técnico](#alcance-técnico)
+  - [Compatibilidad](#compatibilidad)
+  - [Requisitos locales](#requisitos-locales)
+    - [Linux (Debian/Ubuntu)](#linux-debianubuntu)
+    - [Windows](#windows)
+  - [Configuración del proyecto](#configuración-del-proyecto)
+    - [1. Haz un fork y clona tu copia](#1-haz-un-fork-y-clona-tu-copia)
+    - [2. Instala las dependencias](#2-instala-las-dependencias)
+    - [3. Configura las variables locales](#3-configura-las-variables-locales)
+    - [4. Inicia la aplicación](#4-inicia-la-aplicación)
+  - [Pruebas y formato](#pruebas-y-formato)
+  - [Validación por tipo de cambio](#validación-por-tipo-de-cambio)
+  - [Flujo de contribución](#flujo-de-contribución)
+    - [1. Actualiza tu copia local](#1-actualiza-tu-copia-local)
+    - [2. Crea una rama](#2-crea-una-rama)
+    - [3. Implementa y prueba el cambio](#3-implementa-y-prueba-el-cambio)
+    - [4. Añade los archivos correctos](#4-añade-los-archivos-correctos)
+    - [5. Crea un commit claro](#5-crea-un-commit-claro)
+    - [6. Sube tu rama](#6-sube-tu-rama)
+    - [7. Abre el pull request](#7-abre-el-pull-request)
+  - [Desarrollo con Docker](#desarrollo-con-docker)
+  - [Reglas de seguridad](#reglas-de-seguridad)
+  - [Checklist de pull request](#checklist-de-pull-request)
+  - [Cambios del proyecto original](#cambios-del-proyecto-original)
+  - [Código de conducta](#código-de-conducta)
+  - [¿Necesitas ayuda?](#necesitas-ayuda)
 
-You can refer to the following articles on the basics of Git and GitHub in case you are stuck:
+## Antes de empezar
 
-- [Forking a Repo](https://help.github.com/en/github/getting-started-with-github/fork-a-repo)
-- [Cloning a Repo](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository)
-- [How to create a Pull Request](https://opensource.com/article/19/7/create-pull-request-github)
-- [Getting started with Git and GitHub](https://towardsdatascience.com/getting-started-with-git-and-github-6fcd0f2d4ac6)
-- [Learn GitHub from Scratch](https://github.com/githubtraining/introduction-to-github)
+Antes de crear un issue o pull request:
 
-### Installing Requirements
+- Busca en los [issues existentes](https://github.com/alvar3zjos3/dev-readme-contributions/issues) para evitar duplicados.
+- Describe el problema con pasos para reproducirlo, el resultado actual y el resultado esperado.
+- No incluyas tokens, archivos `.env`, capturas con secretos ni datos privados.
+- Para cambios visuales, adjunta una captura o una URL reproducible con los parámetros utilizados.
+- Para cambios de comportamiento, añade o actualiza las pruebas correspondientes.
+- Prueba el cambio localmente antes de abrir un pull request.
+- Mantén cada issue y pull request centrado en un único objetivo siempre que sea posible.
 
-#### Requirements
+## Alcance técnico
 
-- [PHP 8.2+](https://www.apachefriends.org/index.html)
-- [Composer](https://getcomposer.org)
-- [Inkscape](https://inkscape.org) (for PNG rendering)
+Antes de editar el código, identifica el componente responsable. Mantén los cambios pequeños, aislados y acompañados de pruebas o documentación cuando corresponda.
 
-#### Linux
+| Tipo de cambio | Archivos habituales | Validación esperada |
+|---|---|---|
+| Nuevo parámetro de URL | `src/index.php`, `src/card.php` | SVG, JSON, valor predeterminado y valor inválido |
+| Cálculo de contribuciones o rachas | `src/stats.php`, `tests/StatsTest.php` | Casos normales, vacíos y casos límite |
+| Diseño de la tarjeta | `src/card.php`, `tests/expected/` | Comparación visual y URL reproducible |
+| Tema nuevo | `src/themes.php`, documentación de temas | Vista previa y contraste legible |
+| Traducción | `src/translations.php` | Etiquetas sin cortes ni desbordamientos |
+| Despliegue o automatización | `vercel.json`, `Dockerfile`, `.github/` | Build, contenedor o workflow comprobado |
+| Documentación | `README.md`, `CONTRIBUTING.md`, `docs/` | Enlaces, ejemplos y comandos revisados |
+
+## Compatibilidad
+
+`dev-readme-contributions` se utiliza mediante URLs incrustadas en README. Por ese motivo, los cambios deben conservar la compatibilidad con tarjetas y enlaces existentes.
+
+- No elimines ni renombres parámetros de URL publicados sin discutirlo previamente en un issue.
+- Los parámetros nuevos deben ser opcionales y tener valores predeterminados seguros.
+- No cambies el comportamiento de un tema existente sin documentarlo.
+- No modifiques la estructura de la respuesta `type=json` sin actualizar las pruebas y la documentación.
+- Evita añadir solicitudes innecesarias a la API de GitHub; consumen cuota y pueden ralentizar la respuesta de la tarjeta.
+- Si un cambio es incompatible, explícalo claramente en el issue, el pull request y la documentación afectada.
+
+## Requisitos locales
+
+Necesitas las siguientes herramientas para ejecutar, probar y formatear el proyecto en local:
+
+| Herramienta | Uso | Requisito |
+|---|---|---|
+| PHP | Ejecutar la aplicación y PHPUnit | PHP 8.3 o una versión compatible con el proyecto |
+| Composer | Instalar dependencias y ejecutar scripts | Versión estable actual |
+| Git | Clonar el repositorio y gestionar ramas | Versión estable actual |
+| Extensión `intl` de PHP | Formato de fechas, números e idiomas | Obligatoria |
+| Inkscape | Generar y probar tarjetas PNG | Opcional; SVG y JSON no lo necesitan |
+| Docker / Docker Compose | Ejecutar un entorno reproducible en contenedor | Opcional |
+
+> [!NOTE]
+> SVG es el formato principal y funciona sin Inkscape. Solo necesitas Inkscape para desarrollar, generar o validar la salida `type=png`.
+
+### Linux (Debian/Ubuntu)
+
+Instala PHP, extensiones y herramientas básicas:
 
 ```bash
-sudo apt-get install php
-sudo apt-get install php-curl
-sudo apt-get install composer
-sudo apt-get install inkscape
+sudo apt update
+sudo apt install -y php php-cli php-curl php-intl composer git
 ```
 
-#### Windows
+Instala Inkscape solo si necesitas validar PNG:
 
-Install PHP from [XAMPP](https://www.apachefriends.org/index.html) or [php.net](https://windows.php.net/download)
-
-[▶ How to install and run PHP using XAMPP (Windows)](https://www.youtube.com/watch?v=K-qXW9ymeYQ)
-
-[📥 Download Composer](https://getcomposer.org/download/)
-
-### Clone the repository
-
-```
-git clone https://github.com/DenverCoder1/github-readme-streak-stats.git
-cd github-readme-streak-stats
+```bash
+sudo apt install -y inkscape
 ```
 
-### Authorization
+Comprueba que las herramientas estén disponibles:
 
-To get the GitHub API to run locally you will need to provide a token.
-
-1. Visit [this link](https://github.com/settings/tokens/new?description=GitHub%20Readme%20Streak%20Stats) to create a new Personal Access Token
-2. Scroll to the bottom and click **"Generate token"**
-3. **Make a copy** of the `.env.example` named `.env` in the root directory and add **your token** after `TOKEN=`.
-
-```php
-TOKEN=<your-token>
+```bash
+php -v
+composer --version
+git --version
 ```
 
-### Install dependencies
+### Windows
 
-Run the following command to install all the required dependencies to work on this project.
+Puedes instalar PHP desde [php.net](https://windows.php.net/download/) o mediante una distribución local como [XAMPP](https://www.apachefriends.org/). Comprueba que PHP y Composer estén disponibles en el `PATH` de PowerShell o Git Bash.
+
+Instala también:
+
+- [Composer](https://getcomposer.org/download/)
+- [Git para Windows](https://git-scm.com/download/win)
+- [Inkscape](https://inkscape.org/release/) solo si vas a probar `type=png`
+
+Comprueba la instalación:
+
+```bash
+php -v
+composer --version
+git --version
+```
+
+## Configuración del proyecto
+
+### 1. Haz un fork y clona tu copia
+
+Haz un fork de [dev-readme-contributions](https://github.com/alvar3zjos3/dev-readme-contributions) en tu cuenta de GitHub. Después clona tu fork y registra el repositorio principal como remoto `upstream`:
+
+```bash
+git clone git@github.com:TU_USUARIO/dev-readme-contributions.git
+cd dev-readme-contributions
+git remote add upstream https://github.com/alvar3zjos3/dev-readme-contributions.git
+```
+
+Comprueba los remotos configurados:
+
+```bash
+git remote -v
+```
+
+Debes tener:
+
+- `origin`: tu fork; aquí subirás tus ramas.
+- `upstream`: el repositorio principal; se utiliza para actualizar tu copia local.
+
+### 2. Instala las dependencias
 
 ```bash
 composer install
 ```
 
-### Running the app locally
+Composer instala las dependencias PHP definidas por el proyecto, incluidas las herramientas necesarias para pruebas y formato en desarrollo.
+
+### 3. Configura las variables locales
+
+Copia `.env.example` como `.env`:
+
+```bash
+cp .env.example .env
+```
+
+En PowerShell para Windows:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Edita `.env` y añade tu token personal de GitHub:
+
+```env
+TOKEN=tu_token_personal_de_github
+APP_ENV=development
+```
+
+Durante las pruebas puedes restringir las consultas a tu propio usuario:
+
+```env
+WHITELIST=tu_usuario_de_github
+```
+
+El archivo `.env` es privado. No lo subas al repositorio y no añadas nunca un token real a `.env.example`.
+
+Comprueba que Git lo ignora:
+
+```bash
+git check-ignore -v .env
+```
+
+### 4. Inicia la aplicación
+
+La forma habitual de iniciar el servidor de desarrollo es:
 
 ```bash
 composer start
 ```
 
-Open http://localhost:8000/?user=DenverCoder1 to run the project locally
+Si el script `start` no está definido en `composer.json`, usa el servidor integrado de PHP:
 
-Open http://localhost:8000/demo/ to run the demo site
+```bash
+php -S localhost:8000 -t src
+```
 
-### Running the tests
+Prueba una tarjeta en el navegador:
 
-Run the following command to run the PHPUnit test script which will verify that the tested functionality is still working.
+```text
+http://localhost:8000/?user=TU_USUARIO
+```
+
+Para solicitar los datos en JSON:
+
+```text
+http://localhost:8000/?user=TU_USUARIO&type=json
+```
+
+Si el proyecto incluye una ruta de demostración, puedes abrir:
+
+```text
+http://localhost:8000/demo/
+```
+
+## Pruebas y formato
+
+Ejecuta las pruebas antes de enviar cambios:
 
 ```bash
 composer test
 ```
 
-## Linting
-
-This project uses Prettier for formatting PHP, Markdown, JavaScript and CSS files.
+Como alternativa, ejecuta PHPUnit directamente:
 
 ```bash
-# Run prettier and show the files that need to be fixed
-composer lint
+./vendor/bin/phpunit
+```
 
-# Run prettier and fix the files
+En PowerShell:
+
+```powershell
+php .\vendor\bin\phpunit
+```
+
+El proyecto utiliza Prettier para mantener el formato uniforme de PHP, Markdown, JavaScript y CSS.
+
+Comprueba los archivos que necesitan formato:
+
+```bash
+composer lint
+```
+
+Aplica el formato automáticamente:
+
+```bash
 composer lint-fix
 ```
 
-## Submitting Contributions 👨‍💻
-
-Below you will find the process and workflow used to review and merge your changes.
-
-### Step 0 : Find an issue
-
-- Take a look at the existing issues or create your **own** issues!
-
-![issues tab](https://user-images.githubusercontent.com/63443481/136185624-24447858-de8d-4b0a-bb6b-2528d9031196.PNG)
-
-### Step 1 : Fork the Project
-
-- Fork this repository. This will create a copy of this repository on your GitHub profile.
-  Keep a reference to the original project in the `upstream` remote.
+Antes de abrir un pull request, intenta que estos comandos terminen sin errores:
 
 ```bash
-git clone https://github.com/<your-username>/github-readme-streak-stats.git
-cd github-readme-streak-stats
-git remote add upstream https://github.com/DenverCoder1/github-readme-streak-stats.git
+composer test
+composer lint
 ```
 
-![fork button](https://user-images.githubusercontent.com/63443481/136185816-0b6770d7-0b00-4951-861a-dd15e3954918.PNG)
+## Validación por tipo de cambio
 
-- If you have already forked the project, update your copy before working.
+Además de ejecutar pruebas y formato, valida el comportamiento específico de tu modificación.
 
-```bash
-git remote update
-git checkout <branch-name>
-git rebase upstream/<branch-name>
+| Cambio | Comprobaciones mínimas |
+|---|---|
+| SVG o layout | Tema claro, tema oscuro, tarjeta compacta y etiquetas largas |
+| Rachas | Sin contribuciones, contribución hoy, contribución ayer, racha larga y zona horaria |
+| Modo semanal | Semanas con y sin contribuciones, más días excluidos |
+| Colores | Hexadecimal, color CSS, degradado y valor no válido |
+| JSON | Respuesta válida, errores controlados y campos documentados |
+| Docker | Construcción de imagen y solicitud `/?user=TU_USUARIO` |
+| Vercel | Despliegue de vista previa y solicitud al endpoint |
+| GitHub Actions | Ejecución manual, SVG generado y ausencia de commits vacíos |
+
+Para una modificación visual, incluye una URL reproducible en el pull request, por ejemplo:
+
+```text
+http://localhost:8000/?user=alvar3zjos3&theme=dark&hide_border=true
 ```
 
-### Step 2 : Branch
+No incluyas un token en la URL ni en la descripción del pull request.
 
-Create a new branch. Use its name to identify the issue you're addressing.
+## Flujo de contribución
+
+### 1. Actualiza tu copia local
+
+Antes de comenzar un cambio, actualiza la rama `master` desde el repositorio principal:
 
 ```bash
-# Creates a new branch with the name feature_name and switches to it
-git checkout -b feature_name
+git checkout master
+git fetch upstream
+git rebase upstream/master
+git push origin master
 ```
 
-### Step 3 : Work on the issue assigned
+Si tienes cambios sin guardar, realiza un commit, usa `git stash` o resuélvelos antes de ejecutar el rebase.
 
-- Work on the issue(s) assigned to you.
-- Make all the necessary changes to the codebase.
-- After you've made changes or made your contribution to the project, add changes to the branch you've just created using:
+### 2. Crea una rama
+
+Crea una rama para cada cambio. Su nombre debe describir el objetivo:
 
 ```bash
-# To add all new files to the branch
+git checkout -b feat/nombre-del-cambio
+```
+
+Ejemplos:
+
+```bash
+git checkout -b feat/add-custom-theme
+git checkout -b fix/current-streak-timezone
+git checkout -b docs/improve-vercel-guide
+git checkout -b test/add-weekly-streak-cases
+```
+
+No desarrolles directamente en `master` si vas a enviar el cambio como pull request.
+
+### 3. Implementa y prueba el cambio
+
+Haz las modificaciones necesarias y pruébalas en local.
+
+- Para cambios de diseño, verifica el SVG con temas, tamaños y valores de color distintos.
+- Para cambios de cálculo, prueba rachas vacías, activas, contribuciones hoy, contribuciones ayer, semanas y días excluidos.
+- Para traducciones, revisa que las etiquetas no se corten ni desborden la tarjeta.
+- Para cambios de API, revisa las respuestas SVG y `type=json`.
+- Para documentación, comprueba enlaces, bloques de código y ejemplos.
+
+### 4. Añade los archivos correctos
+
+Revisa el estado del proyecto:
+
+```bash
+git status
+```
+
+Cuando sea posible, añade archivos de forma selectiva:
+
+```bash
+git add src/card.php src/themes.php
+```
+
+También puedes añadir todos los archivos que pertenecen al mismo cambio:
+
+```bash
 git add .
-
-# To add only a few files to the branch
-git add <some files (with path)>
 ```
 
-### Step 4 : Commit
-
-- Commit a descriptive message using:
+Revisa el contenido que se incluirá en el commit:
 
 ```bash
-# This message will get associated with all files you have changed
-git commit -m "message"
+git diff --cached
 ```
 
-### Step 5 : Work Remotely
+Comprueba especialmente que `.env`, tokens, archivos temporales, cachés y salidas generadas no se hayan incluido.
 
-- Now you are ready to your work on the remote repository.
-- When your work is ready and complies with the project conventions, upload your changes to your fork:
+### 5. Crea un commit claro
+
+Usa mensajes descriptivos con el formato Conventional Commits:
 
 ```bash
-# To push your work to your remote repository
-git push -u origin Branch_Name
+git commit -m "tipo: descripción breve"
 ```
 
-- Here is how your branch will look.
+| Prefijo | Cuándo usarlo | Ejemplo |
+|---|---|---|
+| `feat:` | Función nueva | `feat: add compact card layout` |
+| `fix:` | Corrección de un error | `fix: handle current streak after midnight` |
+| `docs:` | Documentación | `docs: clarify Docker deployment steps` |
+| `test:` | Pruebas | `test: add excluded day streak cases` |
+| `refactor:` | Reorganización sin cambio funcional | `refactor: simplify GraphQL response parsing` |
+| `style:` | Formato o estilo sin cambio funcional | `style: format SVG markup` |
+| `ci:` | Workflows y automatización | `ci: update static SVG workflow` |
+| `chore:` | Mantenimiento o configuración interna | `chore: update Composer dependencies` |
 
-  ![forked branch](https://user-images.githubusercontent.com/63443481/136186235-204f5c7a-1129-44b5-af20-89aa6a68d952.PNG)
+Ejemplo:
 
-### Step 6 : Pull Request
+```bash
+git commit -m "feat: add custom contribution theme"
+```
 
-- Go to your forked repository in your browser and click on "Compare and pull request". Then add a title and description to your pull request that explains your contribution.
+### 6. Sube tu rama
 
-<img width="700" alt="compare and pull request" src="https://user-images.githubusercontent.com/63443481/136186304-c0a767ea-1fd2-4b0c-b5a8-3e366ddc06a3.PNG">
+```bash
+git push -u origin feat/nombre-del-cambio
+```
 
-<img width="882" alt="opening pull request" src="https://user-images.githubusercontent.com/63443481/136186322-bfd5f333-136a-4d2f-8891-e8f97c379ba8.PNG">
+GitHub mostrará un botón para abrir el pull request. También puedes crearlo desde la pestaña **Pull requests** de tu fork.
 
-- Voila! Your Pull Request has been submitted and it's ready to be merged.🥳
+### 7. Abre el pull request
 
-#### Happy Contributing!
+El pull request debe dirigirse desde tu rama hacia `master` en `alvar3zjos3/dev-readme-contributions`.
+
+Incluye en la descripción:
+
+- Qué problema resuelve o qué función incorpora.
+- Qué archivos o componentes cambiaste.
+- Cómo probaste el cambio.
+- Una URL reproducible o captura, si modificaste el diseño.
+- Una referencia al issue relacionado usando `Closes #NUMERO`, cuando corresponda.
+
+Mantén cada pull request limitado a una mejora. Evita combinar refactors grandes, cambios visuales, traducciones y funciones nuevas si pueden separarse.
+
+## Desarrollo con Docker
+
+Docker es opcional, pero permite reproducir un entorno con Apache, PHP, la extensión `intl` e Inkscape.
+
+Construye la imagen desde la raíz del proyecto:
+
+```bash
+docker build -t dev-readme-contributions .
+```
+
+Ejecuta el contenedor e inyecta las variables solo en tiempo de ejecución:
+
+```bash
+docker run --rm -p 8080:80 \
+  -e TOKEN=tu_token_personal_de_github \
+  -e WHITELIST=TU_USUARIO \
+  dev-readme-contributions
+```
+
+Prueba la aplicación:
+
+```text
+http://localhost:8080/?user=TU_USUARIO
+```
+
+Para validar la salida PNG:
+
+```text
+http://localhost:8080/?user=TU_USUARIO&type=png
+```
+
+No introduzcas secretos mediante `COPY`, `ARG`, `ENV` ni commits en el `Dockerfile`.
+
+## Reglas de seguridad
+
+- Nunca publiques `TOKEN`, `GITHUB_TOKEN`, `ACTION_TOKEN` ni claves con prefijos como `ghs_`, `ghp_` o `github_pat_`.
+- No hagas commit de `.env`, `DOCKER_ENV`, archivos de caché, credenciales ni resultados que contengan información privada.
+- Usa `.env.example` solo como plantilla, con valores vacíos o ficticios.
+- Configura secretos de producción desde Vercel, Docker Compose/tu proveedor o GitHub Actions; nunca desde archivos versionados.
+- Si GitHub bloquea un push por detección de secretos, elimina el secreto del archivo y del historial antes de volver a subirlo. No desbloquees un secreto real solo para completar el push.
+
+## Checklist de pull request
+
+Antes de enviar un pull request, confirma lo siguiente:
+
+- [ ] Leí esta guía y busqué issues o pull requests similares.
+- [ ] Mi rama se centra en un único cambio principal.
+- [ ] Actualicé mi copia local desde `upstream/master`.
+- [ ] Probé el cambio localmente.
+- [ ] Ejecuté `composer test`.
+- [ ] Ejecuté `composer lint`.
+- [ ] Añadí o actualicé pruebas si modifiqué lógica.
+- [ ] Actualicé la documentación si cambié una opción, URL o comportamiento.
+- [ ] Incluí una URL reproducible o una captura si modifiqué el diseño.
+- [ ] No incluí `.env`, tokens, credenciales, cachés ni archivos generados accidentalmente.
+- [ ] No rompí parámetros existentes ni respuestas JSON sin documentarlo.
+
+## Cambios del proyecto original
+
+`dev-readme-contributions` adapta la base de `DenverCoder1/github-readme-streak-stats`, pero mantiene su identidad, configuración, documentación y decisiones propias dentro del ecosistema `dev-readme-stats`.
+
+Si quieres adaptar una mejora del proyecto original:
+
+1. Abre un issue explicando qué mejora quieres portar.
+2. Enlaza el commit, issue o pull request de origen.
+3. Adapta el cambio al estilo, idioma y configuración de este repositorio.
+4. Añade pruebas y documentación propias.
+5. Envía un pull request independiente y centrado en ese cambio.
+
+No sincronices directamente el repositorio original sobre `master`: podrías sobrescribir personalizaciones, documentación y decisiones específicas de `dev-readme-contributions`.
+
+## Código de conducta
+
+Al participar en el proyecto aceptas respetar el [Código de conducta](./CODE_OF_CONDUCT.md). Trata a las demás personas con respeto, ofrece críticas constructivas y centra las conversaciones en mejorar el proyecto.
+
+## ¿Necesitas ayuda?
+
+Si te atascas con Git, GitHub, PHP, Vercel, Docker o el flujo de contribución, abre un [issue](https://github.com/alvar3zjos3/dev-readme-contributions/issues/new/choose) con la información relevante. No incluyas secretos, tokens ni variables privadas.
+
+¡Gracias por contribuir a `dev-readme-contributions`!
