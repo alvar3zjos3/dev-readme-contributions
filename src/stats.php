@@ -5,11 +5,11 @@ declare(strict_types=1);
 require_once "whitelist.php";
 
 /**
- * Build a GraphQL query for a contribution graph
+ * Construye la consulta GraphQL para obtener el calendario de contribuciones de un año.
  *
- * @param string $user GitHub username to get graphs for
- * @param int $year Year to get graph for
- * @return string GraphQL query
+ * @param string $user Nombre de usuario de GitHub
+ * @param int $year Año del que se obtendrán las contribuciones
+ * @return string Consulta GraphQL formateada
  */
 function buildContributionGraphQuery(string $user, int $year): string
 {
@@ -34,79 +34,95 @@ function buildContributionGraphQuery(string $user, int $year): string
 }
 
 /**
- * Execute multiple requests with cURL and handle GitHub API rate limits and errors
+ * Ejecuta múltiples peticiones cURL en paralelo y gestiona límites de API y reintentos.
  *
- * @param string $user GitHub username to get graphs for
- * @param array<int> $years Years to get graphs for
- * @return array<int,stdClass> List of GraphQL response objects with years as keys
+ * @param string $user Nombre de usuario de GitHub
+ * @param array<int> $years Lista de años a consultar
+ * @return array<int,stdClass> Respuestas GraphQL decodificadas con los años como clave
  */
 function executeContributionGraphRequests(string $user, array $years): array
 {
     $tokens = [];
     $requests = [];
-    // build handles for each year
+
+    // Prepara las peticiones individuales para cada año
     foreach ($years as $year) {
         $tokens[$year] = getGitHubToken();
         $query = buildContributionGraphQuery($user, $year);
         $requests[$year] = getGraphQLCurlHandle($query, $tokens[$year]);
     }
-    // build multi-curl handle
+
+    // Inicializa multi-cURL para ejecutar consultas en paralelo
     $multi = curl_multi_init();
     foreach ($requests as $handle) {
         curl_multi_add_handle($multi, $handle);
     }
-    // execute queries
+
+    // Espera activa controlada para resolver todas las peticiones
     $running = null;
     do {
-        curl_multi_exec($multi, $running);
-    } while ($running);
-    // collect responses
+        $status = curl_multi_exec($multi, $running);
+        if ($running) {
+            curl_multi_select($multi);
+        }
+    } while ($running > 0 && $status === CURLM_OK);
+
+    // Procesa las respuestas obtenidas
     $responses = [];
     foreach ($requests as $year => $handle) {
         $contents = curl_multi_getcontent($handle);
         $decoded = is_string($contents) ? json_decode($contents) : null;
-        // if response is empty or invalid, retry request one time or throw an error
+
+        // Si la respuesta está vacía o contiene errores, reintenta de forma individual
         if (empty($decoded) || empty($decoded->data) || !empty($decoded->errors)) {
-            $message = $decoded->errors[0]->message ?? ($decoded->message ?? "An API error occurred.");
+            $curlErrno = curl_errno($handle);
+            $curlError = curl_error($handle);
+            $message = $decoded->errors[0]->message ?? ($decoded->message ?? "Ocurrió un error en la API ($curlErrno: $curlError).");
             $error_type = $decoded->errors[0]->type ?? "";
-            // Missing SSL certificate
-            if (curl_errno($handle) === 60) {
-                throw new AssertionError("You don't have a valid SSL Certificate installed or XAMPP.", 500);
+
+            // Error de certificado SSL
+            if ($curlErrno === 60) {
+                throw new AssertionError("Error de certificado SSL: " . $curlError, 500);
             }
-            // Other cURL error
-            elseif (curl_errno($handle)) {
-                throw new AssertionError("cURL error: " . curl_error($handle), 500);
+            // Otros errores de conexión cURL
+            elseif ($curlErrno) {
+                throw new AssertionError("Error de cURL: " . $curlError, 500);
             }
-            // GitHub API error - Not Found
+            // Usuario no encontrado en GitHub
             elseif ($error_type === "NOT_FOUND") {
-                throw new InvalidArgumentException("Could not find a user with that name.", 404);
+                throw new InvalidArgumentException("No se encontró ningún usuario con ese nombre en GitHub.", 404);
             }
-            // if rate limit is exceeded, don't retry with same token
+
+            // Si se excede la cuota de peticiones, rota el token
             if (str_contains($message, "rate limit exceeded")) {
                 removeGitHubToken($tokens[$year]);
             }
-            error_log("First attempt to decode response for $user's $year contributions failed. $message");
-            error_log("Contents: $contents");
-            // retry request
+            error_log("Falló el primer intento para las contribuciones de $user en $year. $message");
+
+            // Reintento único síncrono
             $query = buildContributionGraphQuery($user, $year);
             $token = getGitHubToken();
             $request = getGraphQLCurlHandle($query, $token);
             $contents = curl_exec($request);
             $decoded = is_string($contents) ? json_decode($contents) : null;
-            // if the response is still empty or invalid, log an error and skip the year
+
+            // Si vuelve a fallar, registra el error y omite el año
             if (empty($decoded) || empty($decoded->data)) {
-                $message = $decoded->errors[0]->message ?? ($decoded->message ?? "An API error occurred.");
+                $retryErrno = curl_errno($request);
+                $retryError = curl_error($request);
+                $message = $decoded->errors[0]->message ?? ($decoded->message ?? "Error de API (cURL $retryErrno: $retryError)");
+
                 if (str_contains($message, "rate limit exceeded")) {
                     removeGitHubToken($token);
                 }
-                error_log("Failed to decode response for $user's $year contributions after 2 attempts. $message");
-                error_log("Contents: $contents");
+                error_log("Fallaron 2 intentos para las contribuciones de $user en $year. $message");
                 continue;
             }
         }
         $responses[$year] = $decoded;
     }
-    // close the handles
+
+    // Limpia los manejadores de multi-cURL
     foreach ($requests as $request) {
         curl_multi_remove_handle($multi, $request);
     }
@@ -115,117 +131,120 @@ function executeContributionGraphRequests(string $user, array $years): array
 }
 
 /**
- * Get all HTTP request responses for user's contributions
+ * Obtiene todas las respuestas de contribución para un usuario.
  *
- * @param string $user GitHub username to get graphs for
- * @param int|null $startingYear Override the minimum year to get graphs for
- * @return array<stdClass> List of contribution graph response objects
+ * @param string $user Nombre de usuario de GitHub
+ * @param int|null $startingYear Año mínimo personalizado para iniciar el conteo
+ * @return array<stdClass> Lista de respuestas con los grafos de contribución
  */
 function getContributionGraphs(string $user, ?int $startingYear = null): array
 {
+    // Valida la lista blanca si está configurada
     if (!isWhitelisted($user)) {
-        throw new InvalidArgumentException("User not in whitelist.", 403);
+        throw new InvalidArgumentException("El usuario no está en la lista blanca autorizada.", 403);
     }
 
-    // get the list of years the user has contributed and the current year's contribution graph
+    // Obtiene el año actual y la fecha de registro del usuario
     $currentYear = intval(date("Y"));
     $responses = executeContributionGraphRequests($user, [$currentYear]);
-    // get user's created date (YYYY-MM-DDTHH:MM:SSZ format)
     $userCreatedDateTimeString = $responses[$currentYear]->data->user->createdAt ?? null;
-    // if there are no contribution years, an API error must have occurred
+
     if (empty($userCreatedDateTimeString)) {
-        throw new AssertionError("Failed to retrieve contributions. This is likely a GitHub API issue.", 500);
+        throw new AssertionError("No se pudieron obtener las contribuciones. Posible problema de API en GitHub.", 500);
     }
-    // extract the year from the created datetime string
+
+    // Determina el año de registro en GitHub
     $userCreatedYear = intval(explode("-", $userCreatedDateTimeString)[0]);
-    // if override parameter is null then define starting year
-    // as the user created year; else use the provided override year
+
+    // Establece el año inicial (mínimo 2005, año de creación de Git)
     $minimumYear = $startingYear ?: $userCreatedYear;
-    // make sure the minimum year is not before 2005 (the year Git was created)
     $minimumYear = max($minimumYear, 2005);
-    // create an array of years from the user's created year to one year before the current year
     $yearsToRequest = range($minimumYear, $currentYear - 1);
-    // also check the first contribution year if the year is before 2005 (the year Git was created)
-    // since the user may have backdated some commits to a specific year such as 1970 (see #448)
+
+    // Revisa si existen contribuciones anteriores a 2005 por fechas manipuladas
     $contributionYears = $responses[$currentYear]->data->user->contributionsCollection->contributionYears ?? [];
     $firstContributionYear = $contributionYears[count($contributionYears) - 1] ?? $userCreatedYear;
     if ($firstContributionYear < 2005) {
         array_unshift($yearsToRequest, $firstContributionYear);
     }
-    // get the contribution graphs for the previous years
+
+    // Consulta los años históricos restantes
     $responses += executeContributionGraphRequests($user, $yearsToRequest);
     return $responses;
 }
 
 /**
- * Get all tokens from environment variables (TOKEN, TOKEN2, TOKEN3, etc.) if they are set
+ * Obtiene todos los tokens configurados en variables de entorno (TOKEN, TOKEN2, TOKEN3, etc.).
  *
- * @return array<string> List of tokens
+ * @return array<string> Lista de tokens de GitHub
  */
 function getGitHubTokens(): array
 {
-    // result is already calculated
+    // Retorna el pool almacenado en memoria si ya fue calculado
     if (isset($GLOBALS["ALL_TOKENS"])) {
         return $GLOBALS["ALL_TOKENS"];
     }
-    // find all tokens in environment variables
-    $tokens = isset($_SERVER["TOKEN"]) ? [$_SERVER["TOKEN"]] : [];
-    $index = 2;
-    while (isset($_SERVER["TOKEN{$index}"])) {
-        // add token to list
-        $tokens[] = $_SERVER["TOKEN{$index}"];
+
+    $tokens = [];
+    $index = 1;
+
+    while (true) {
+        $name = $index === 1 ? "TOKEN" : "TOKEN{$index}";
+        $token = $_ENV[$name] ?? $_SERVER[$name] ?? getenv($name) ?: null;
+
+        if ($token === null || trim((string) $token) === "") {
+            break;
+        }
+
+        $tokens[] = trim((string) $token);
         $index++;
     }
-    // store for future use
+
     $GLOBALS["ALL_TOKENS"] = $tokens;
     return $tokens;
 }
 
 /**
- * Get a token from the token pool
+ * Selecciona un token aleatorio del pool disponible.
  *
- * @return string GitHub token
- *
- * @throws AssertionError if no tokens are available
+ * @return string Token de GitHub
+ * @throws AssertionError Si no hay ningún token disponible
  */
 function getGitHubToken(): string
 {
     $all_tokens = getGitHubTokens();
-    // if there is no available token, throw an error (this should never happen)
     if (empty($all_tokens)) {
-        throw new AssertionError("There is no GitHub token available.", 500);
+        throw new AssertionError("No hay ningún token de GitHub disponible en la configuración.", 500);
     }
     return $all_tokens[array_rand($all_tokens)];
 }
 
 /**
- * Remove a token from the token pool
+ * Elimina un token agotado temporalmente por límite de peticiones.
  *
- * @param string $token Token to remove
+ * @param string $token Token a remover del pool
  * @return void
- *
- * @throws AssertionError if no tokens are available after removing the token
  */
 function removeGitHubToken(string $token): void
 {
-    $index = array_search($token, $GLOBALS["ALL_TOKENS"]);
+    $index = array_search($token, $GLOBALS["ALL_TOKENS"] ?? []);
     if ($index !== false) {
         unset($GLOBALS["ALL_TOKENS"][$index]);
     }
-    // if there is no available token, throw an error
     if (empty($GLOBALS["ALL_TOKENS"])) {
         throw new AssertionError(
-            "We are being rate-limited! Check <a href='https://git.io/streak-ratelimit' font-weight='bold'>git.io/streak-ratelimit</a> for details.",
-            429,
+            "Se ha excedido el límite de solicitudes de la API de GitHub. Revisa tus tokens.",
+            429
         );
     }
 }
 
-/** Create a CurlHandle for a POST request to GitHub's GraphQL API
+/**
+ * Crea un manejador cURL para realizar una petición POST a la API GraphQL de GitHub.
  *
- * @param string $query GraphQL query
- * @param string $token GitHub token to use for the request
- * @return CurlHandle The curl handle for the request
+ * @param string $query Consulta GraphQL
+ * @param string $token Token de GitHub para la autenticación
+ * @return CurlHandle Manejador cURL configurado
  */
 function getGraphQLCurlHandle(string $query, string $token): CurlHandle
 {
@@ -233,10 +252,10 @@ function getGraphQLCurlHandle(string $query, string $token): CurlHandle
         "Authorization: bearer $token",
         "Content-Type: application/json",
         "Accept: application/vnd.github.v4.idl",
-        "User-Agent: GitHub-Readme-Streak-Stats",
+        "User-Agent: dev-readme-contributions",
     ];
     $body = ["query" => $query];
-    // create curl request
+
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, "https://api.github.com/graphql");
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
@@ -244,35 +263,39 @@ function getGraphQLCurlHandle(string $query, string $token): CurlHandle
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-    curl_setopt($ch, CURLOPT_VERBOSE, false);
+
+    // En Windows (PHP 8.2+), utiliza los certificados nativos del sistema operativo
+    if (defined("CURLSSLOPT_NATIVE_CA")) {
+        curl_setopt($ch, CURLOPT_SSL_OPTIONS, CURLSSLOPT_NATIVE_CA);
+    }
     return $ch;
 }
 
 /**
- * Get an array of all dates with the number of contributions
+ * Mapea las fechas (Y-m-d) con la cantidad de contribuciones correspondientes.
  *
- * @param array<int,stdClass> $contributionGraphs List of GraphQL response objects by year
- * @param string $timezone Timezone identifier, or empty for the server default
- * @param DateTimeImmutable|null $now Current time override for tests
- * @return array<string,int> Y-M-D dates mapped to the number of contributions
+ * @param array<int,stdClass> $contributionGraphs Lista de respuestas GraphQL por año
+ * @param string $timezone Zona horaria del usuario o vacío para la del servidor
+ * @param DateTimeImmutable|null $now Fecha y hora actual (útil para pruebas)
+ * @return array<string,int> Array asociativo de fechas y número de contribuciones
  */
 function getContributionDates(array $contributionGraphs, string $timezone = "", ?DateTimeImmutable $now = null): array
 {
     $contributions = [];
     $today = getCurrentDate($timezone, $now);
     $tomorrow = date("Y-m-d", strtotime("$today +1 day"));
-    // sort contribution calendars by year key
+
+    // Ordena los calendarios cronológicamente por año
     ksort($contributionGraphs);
     foreach ($contributionGraphs as $graph) {
-        $weeks = $graph->data->user->contributionsCollection->contributionCalendar->weeks;
+        $weeks = $graph->data->user->contributionsCollection->contributionCalendar->weeks ?? [];
         foreach ($weeks as $week) {
             foreach ($week->contributionDays as $day) {
                 $date = $day->date;
                 $count = $day->contributionCount;
-                // count contributions up until today
-                // also count next day if user contributed already
+
+                // Contabiliza contribuciones hasta el día de hoy (o mañana si ya hay actividad registrada)
                 if ($date <= $today || ($date == $tomorrow && $count > 0)) {
-                    // add contributions to the array
                     $contributions[$date] = $count;
                 }
             }
@@ -282,18 +305,18 @@ function getContributionDates(array $contributionGraphs, string $timezone = "", 
 }
 
 /**
- * Get the current date for a requested timezone.
+ * Devuelve la fecha actual en formato Y-m-d para una zona horaria dada.
  *
- * @param string $timezone Timezone identifier, or empty for the server default
- * @param DateTimeImmutable|null $now Current time override for tests
- * @return string Current date in Y-m-d format
+ * @param string $timezone Identificador de zona horaria (ej. Europe/Madrid)
+ * @param DateTimeImmutable|null $now Sobrescritura de fecha/hora para tests
+ * @return string Fecha actual en formato Y-m-d
  */
 function getCurrentDate(string $timezone = "", ?DateTimeImmutable $now = null): string
 {
     try {
         $dateTimezone = new DateTimeZone($timezone ?: date_default_timezone_get());
     } catch (Exception) {
-        throw new InvalidArgumentException("Invalid timezone.", 400);
+        throw new InvalidArgumentException("Zona horaria no válida.", 400);
     }
 
     $now = $now ?: new DateTimeImmutable("now");
@@ -301,52 +324,50 @@ function getCurrentDate(string $timezone = "", ?DateTimeImmutable $now = null): 
 }
 
 /**
- * Normalize names of days of the week (eg. ["Sunday", " mon", "TUE"] -> ["Sun", "Mon", "Tue"])
+ * Normaliza los nombres de los días de la semana a formato abreviado (Sun, Mon, etc.).
  *
- * @param array<string> $days List of days of the week
- * @return array<string> List of normalized days of the week
+ * @param array<string> $days Lista de días de la semana recibidos
+ * @return array<string> Lista normalizada de días válidos
  */
 function normalizeDays(array $days): array
 {
     return array_filter(
         array_map(function ($dayOfWeek) {
-            // trim whitespace, capitalize first letter only, return first 3 characters
             $dayOfWeek = substr(ucfirst(strtolower(trim($dayOfWeek))), 0, 3);
-            // return day if valid, otherwise return null
             return in_array($dayOfWeek, ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]) ? $dayOfWeek : null;
-        }, $days),
+        }, $days)
     );
 }
 
 /**
- * Check if a day is an excluded day of the week
+ * Comprueba si una fecha corresponde a un día de la semana excluido del cálculo.
  *
- * @param string $date Date to check (Y-m-d)
- * @param array<string> $excludedDays List of days of the week to exclude
- * @return bool True if the day is excluded, false otherwise
+ * @param string $date Fecha en formato Y-m-d
+ * @param array<string> $excludedDays Días de la semana excluidos
+ * @return bool True si el día está excluido, false si no
  */
 function isExcludedDay(string $date, array $excludedDays): bool
 {
     if (empty($excludedDays)) {
         return false;
     }
-    $day = date("D", strtotime($date)); // "D" = Mon, Tue, Wed, etc.
+    $day = date("D", strtotime($date));
     return in_array($day, $excludedDays);
 }
 
 /**
- * Get a stats array with the contribution count, daily streak, and dates
+ * Calcula las métricas de racha diaria, total y fechas de inicio/fin.
  *
- * @param array<string,int> $contributions Y-M-D contribution dates with contribution counts
- * @param array<string> $excludedDays List of days of the week to exclude
- * @return array<string,mixed> Streak stats
+ * @param array<string,int> $contributions Fechas con conteo de contribuciones
+ * @param array<string> $excludedDays Días excluidos del cálculo
+ * @return array<string,mixed> Estadísticas calculadas de la racha
  */
 function getContributionStats(array $contributions, array $excludedDays = []): array
 {
-    // if no contributions, display error
     if (empty($contributions)) {
-        throw new AssertionError("No contributions found.", 204);
+        throw new AssertionError("No se encontraron contribuciones para este usuario.", 204);
     }
+
     $today = array_key_last($contributions);
     $first = array_key_first($contributions);
     $stats = [
@@ -366,34 +387,29 @@ function getContributionStats(array $contributions, array $excludedDays = []): a
         "excludedDays" => $excludedDays,
     ];
 
-    // calculate the stats from the contributions array
     foreach ($contributions as $date => $count) {
-        // add contribution count to total
         $stats["totalContributions"] += $count;
-        // check if still in streak
+
+        // Comprueba si continúa la racha o si es un día excluido dentro de una racha activa
         if ($count > 0 || ($stats["currentStreak"]["length"] > 0 && isExcludedDay($date, $excludedDays))) {
-            // increment streak
             ++$stats["currentStreak"]["length"];
             $stats["currentStreak"]["end"] = $date;
-            // set start on first day of streak
+
             if ($stats["currentStreak"]["length"] == 1) {
                 $stats["currentStreak"]["start"] = $date;
             }
-            // set first contribution date the first time
             if (!$stats["firstContribution"]) {
                 $stats["firstContribution"] = $date;
             }
-            // update longestStreak
+
+            // Actualiza la racha más larga si la actual la supera
             if ($stats["currentStreak"]["length"] > $stats["longestStreak"]["length"]) {
-                // copy current streak start, end, and length into longest streak
                 $stats["longestStreak"]["start"] = $stats["currentStreak"]["start"];
                 $stats["longestStreak"]["end"] = $stats["currentStreak"]["end"];
                 $stats["longestStreak"]["length"] = $stats["currentStreak"]["length"];
             }
-        }
-        // reset streak but give exception for today
-        elseif ($date != $today) {
-            // reset streak
+        } elseif ($date != $today) {
+            // Reinicia la racha actual (excepto si hoy aún no ha terminado)
             $stats["currentStreak"]["length"] = 0;
             $stats["currentStreak"]["start"] = $today;
             $stats["currentStreak"]["end"] = $today;
@@ -403,10 +419,10 @@ function getContributionStats(array $contributions, array $excludedDays = []): a
 }
 
 /**
- * Get the previous Sunday of a given date
+ * Obtiene el domingo anterior a una fecha dada.
  *
- * @param string $date Date to get previous Sunday of (Y-m-d)
- * @return string Previous Sunday
+ * @param string $date Fecha en formato Y-m-d
+ * @return string Fecha del domingo anterior en formato Y-m-d
  */
 function getPreviousSunday(string $date): string
 {
@@ -415,17 +431,17 @@ function getPreviousSunday(string $date): string
 }
 
 /**
- * Get a stats array with the contribution count, weekly streak, and dates
+ * Calcula las estadísticas de contribuciones en modo semanal.
  *
- * @param array<string,int> $contributions Y-M-D contribution dates with contribution counts
- * @return array<string,mixed> Streak stats
+ * @param array<string,int> $contributions Fechas con conteo de contribuciones
+ * @return array<string,mixed> Estadísticas de racha semanal
  */
 function getWeeklyContributionStats(array $contributions): array
 {
-    // if no contributions, display error
     if (empty($contributions)) {
-        throw new AssertionError("No contributions found.", 204);
+        throw new AssertionError("No se encontraron contribuciones para este usuario.", 204);
     }
+
     $thisWeek = getPreviousSunday(array_key_last($contributions));
     $first = array_key_first($contributions);
     $firstWeek = getPreviousSunday($first);
@@ -445,7 +461,7 @@ function getWeeklyContributionStats(array $contributions): array
         ],
     ];
 
-    // calculate contributions per week
+    // Agrupa contribuciones por semana
     $weeks = [];
     foreach ($contributions as $date => $count) {
         $week = getPreviousSunday($date);
@@ -454,37 +470,28 @@ function getWeeklyContributionStats(array $contributions): array
         }
         if ($count > 0) {
             $weeks[$week] += $count;
-            // set first contribution date the first time
             if (!$stats["firstContribution"]) {
                 $stats["firstContribution"] = $date;
             }
         }
     }
 
-    // calculate the stats from the contributions array
+    // Calcula la racha semana a semana
     foreach ($weeks as $week => $count) {
-        // add contribution count to total
         $stats["totalContributions"] += $count;
-        // check if still in streak
         if ($count > 0) {
-            // increment streak
             ++$stats["currentStreak"]["length"];
             $stats["currentStreak"]["end"] = $week;
-            // set start on first week of streak
+
             if ($stats["currentStreak"]["length"] == 1) {
                 $stats["currentStreak"]["start"] = $week;
             }
-            // update longestStreak
             if ($stats["currentStreak"]["length"] > $stats["longestStreak"]["length"]) {
-                // copy current streak start, end, and length into longest streak
                 $stats["longestStreak"]["start"] = $stats["currentStreak"]["start"];
                 $stats["longestStreak"]["end"] = $stats["currentStreak"]["end"];
                 $stats["longestStreak"]["length"] = $stats["currentStreak"]["length"];
             }
-        }
-        // reset streak but give exception for this week
-        elseif ($week != $thisWeek) {
-            // reset streak
+        } elseif ($week != $thisWeek) {
             $stats["currentStreak"]["length"] = 0;
             $stats["currentStreak"]["start"] = $thisWeek;
             $stats["currentStreak"]["end"] = $thisWeek;

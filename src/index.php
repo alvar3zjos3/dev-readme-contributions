@@ -2,44 +2,55 @@
 
 declare(strict_types=1);
 
-// load functions
-require_once "../vendor/autoload.php";
-require_once "stats.php";
-require_once "card.php";
-require_once "cache.php";
-require_once "generator.php";
+// Carga las dependencias y módulos de la aplicación.
+require_once __DIR__ . "/../vendor/autoload.php";
+require_once __DIR__ . "/stats.php";
+require_once __DIR__ . "/card.php";
+require_once __DIR__ . "/cache.php";
+require_once __DIR__ . "/generator.php";
 
-// load .env
-$dotenv = \Dotenv\Dotenv::createImmutable(dirname(__DIR__, 1));
+// Carga el archivo .env durante el desarrollo local.
+// En Vercel y Docker, las variables se reciben desde el entorno del sistema.
+$projectRoot = dirname(__DIR__);
+$dotenv = \Dotenv\Dotenv::createImmutable($projectRoot);
 $dotenv->safeLoad();
 
-// if environment variables are not loaded, display error
-if (!isset($_SERVER["TOKEN"])) {
-    $message = file_exists(dirname(__DIR__ . "../.env", 1))
-        ? "Missing token in config. Check Contributing.md for details."
-        : ".env was not found. Check Contributing.md for details.";
+// Obtiene TOKEN desde .env, Vercel o Docker.
+// La prioridad permite compatibilidad entre entornos sin exponer el valor.
+$token = $_ENV["TOKEN"] ?? $_SERVER["TOKEN"] ?? getenv("TOKEN") ?: null;
+
+// Comprueba que existe un token antes de consultar la API de GitHub.
+if (empty($token)) {
+    $message = file_exists($projectRoot . "/.env")
+        ? "Falta TOKEN en .env. Consulta CONTRIBUTING.md para configurarlo."
+        : "No se encontró .env. Copia .env.example como .env y configura TOKEN.";
+
     renderOutput($message, 500);
+    exit();
 }
 
-// set cache to refresh once per day (24 hours)
+// Configura una caché pública de 24 horas.
 $cacheSeconds = CACHE_DURATION;
 header("Expires: " . gmdate("D, d M Y H:i:s", time() + $cacheSeconds) . " GMT");
 header("Last-Modified: " . gmdate("D, d M Y H:i:s") . " GMT");
 header("Cache-Control: public, max-age=$cacheSeconds");
 
-// redirect to demo site if user is not given
-if (!isset($_REQUEST["user"])) {
+// Redirige a la página de demostración si no se indicó un usuario.
+if (!isset($_REQUEST["user"]) || trim((string) $_REQUEST["user"]) === "") {
     header("Location: demo/");
     exit();
 }
 
 try {
-    $stats = generateStreakStats($_REQUEST["user"], $_REQUEST);
+    $stats = generateStreakStats((string) $_REQUEST["user"], $_REQUEST);
     renderOutput($stats);
 } catch (InvalidArgumentException | AssertionError $error) {
     error_log("Error {$error->getCode()}: {$error->getMessage()}");
+
+    // Los errores de servidor incluyen trazas para facilitar el diagnóstico.
     if ($error->getCode() >= 500) {
         error_log($error->getTraceAsString());
     }
+
     renderOutput($error->getMessage(), $error->getCode());
 }
