@@ -1,6 +1,17 @@
 <?php
 
-// return a list of valid CSS colors
+declare(strict_types=1);
+
+/**
+ * Lista permitida de palabras clave de color CSS.
+ *
+ * Estos identificadores se usan para validar los parámetros de color
+ * personalizados antes de incluirlos en el SVG generado. Los valores deben
+ * mantenerse en inglés y en minúsculas porque son palabras clave oficiales
+ * de CSS y SVG.
+ *
+ * @return array<int,string> Colores CSS permitidos
+ */
 return [
     "aliceblue",
     "antiquewhite",
