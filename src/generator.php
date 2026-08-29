@@ -3,25 +3,28 @@
 declare(strict_types=1);
 
 /**
- * Generate streak stats for a GitHub user from request-style parameters.
+ * Genera las estadísticas de racha de un usuario de GitHub a partir de parámetros tipo request.
  *
- * @param string $user GitHub username to get stats for
- * @param array<string,mixed> $params Options that affect fetching and streak calculation
- * @return array<string,mixed> The calculated streak stats
+ * @param string $user Nombre de usuario de GitHub del que se obtendrán estadísticas
+ * @param array<string,mixed> $params Opciones que afectan a la consulta y al cálculo de la racha
+ * @return array<string,mixed> Estadísticas de racha calculadas
  */
 function generateStreakStats(string $user, array $params = []): array
 {
+    // Elimina caracteres no permitidos para evitar consultas inválidas.
     $user = preg_replace("/[^a-zA-Z0-9\-]/", "", $user);
+
     if ($user === "") {
-        throw new InvalidArgumentException("GitHub username is required.", 400);
+        throw new InvalidArgumentException("Se requiere un nombre de usuario de GitHub.", 400);
     }
 
+    // Obtiene y normaliza las opciones recibidas desde la URL.
     $startingYear = isset($params["starting_year"]) ? intval($params["starting_year"]) : null;
     $mode = isset($params["mode"]) ? strval($params["mode"]) : null;
     $excludeDaysRaw = isset($params["exclude_days"]) ? strval($params["exclude_days"]) : "";
     $timezone = isset($params["timezone"]) ? strval($params["timezone"]) : "";
 
-    // Build cache options based on request parameters
+    // Crea una clave de opciones para guardar y recuperar resultados de caché.
     $cacheOptions = [
         "starting_year" => $startingYear,
         "mode" => $mode,
@@ -29,29 +32,32 @@ function generateStreakStats(string $user, array $params = []): array
         "timezone" => $timezone,
     ];
 
-    // Check if cache is disabled
-    $useCache = !isset($_SERVER["DISABLE_CACHE"]) || strtolower(strval($_SERVER["DISABLE_CACHE"])) !== "true";
+    // Permite desactivar la caché con DISABLE_CACHE=true.
+    $disableCache = $_ENV["DISABLE_CACHE"] ?? $_SERVER["DISABLE_CACHE"] ?? getenv("DISABLE_CACHE") ?: "false";
+    $useCache = strtolower((string) $disableCache) !== "true";
 
-    // Check for cached stats first (24 hour cache) unless cache is disabled
+    // Recupera datos almacenados durante 24 horas, salvo que la caché esté desactivada.
     $cachedStats = $useCache ? getCachedStats($user, $cacheOptions) : null;
 
+    // Devuelve la caché si sigue siendo válida para la zona horaria solicitada.
     if (!statsMissingOrStale($cachedStats, $timezone)) {
         return $cachedStats;
     }
 
-    // Fetch fresh data from GitHub API
+    // Obtiene datos actualizados desde la API de GitHub.
     $contributionGraphs = getContributionGraphs($user, $startingYear);
     $contributions = getContributionDates($contributionGraphs, $timezone);
 
+    // Calcula las estadísticas según el modo de racha solicitado.
     if ($mode === "weekly") {
         $stats = getWeeklyContributionStats($contributions);
     } else {
-        // split and normalize excluded days
+        // Separa y normaliza los días excluidos del cálculo diario.
         $excludeDays = normalizeDays(explode(",", $excludeDaysRaw));
         $stats = getContributionStats($contributions, $excludeDays);
     }
 
-    // Cache the stats for 24 hours unless cache is disabled
+    // Almacena las estadísticas durante 24 horas si la caché está habilitada.
     if ($useCache) {
         setCachedStats($user, $cacheOptions, $stats);
     }
@@ -60,40 +66,43 @@ function generateStreakStats(string $user, array $params = []): array
 }
 
 /**
- * Check if cached stats are missing or stale - Streak may be outdated if it ends before today
+ * Comprueba si las estadísticas almacenadas no existen o están desactualizadas.
  *
- * @param array|null $cachedStats The cached stats to check
- * @param string $timezone Timezone identifier, or empty for the server default
- * @return bool True if the cached stats are stale and should be refreshed
+ * Una racha puede quedar obsoleta si termina antes del día actual, o antes del
+ * comienzo de la semana actual cuando se utiliza el modo semanal.
+ *
+ * @param array|null $cachedStats Estadísticas almacenadas que se van a comprobar
+ * @param string $timezone Identificador de zona horaria o cadena vacía para usar la del servidor
+ * @return bool True si las estadísticas deben volver a solicitarse; false si siguen siendo válidas
  */
 function statsMissingOrStale(?array $cachedStats, string $timezone = ""): bool
 {
-    // If there are no cached stats, we need to refresh
+    // Sin caché no hay datos que reutilizar.
     if ($cachedStats === null) {
         return true;
     }
 
-    // If the cached stats don't have the expected structure, consider them stale
+    // Si la estructura no tiene los campos necesarios, se considera inválida.
     if (!isset($cachedStats["currentStreak"]["end"]) || !isset($cachedStats["currentStreak"]["length"])) {
         return true;
     }
 
-    // If the current streak length is 0, we can consider it stale to allow for new streaks to be detected without waiting for the cache to expire
+    // Una racha de longitud 0 se actualiza para detectar actividad nueva sin esperar 24 horas.
     $currentStreakLength = $cachedStats["currentStreak"]["length"];
     if ($currentStreakLength === 0) {
         return true;
     }
 
-    // Check if the current streak ends before today (or before the start of the week for weekly mode)
-    // If the streak ends before today, it may be outdated and we should refresh to check for new contributions
+    // Comprueba si la racha termina antes de hoy o, en modo semanal, antes de la semana actual.
     $currentStreakEnd = $cachedStats["currentStreak"]["end"];
     $mode = $cachedStats["mode"] ?? "daily";
 
     if ($mode === "weekly") {
         $today = getCurrentDate($timezone);
         $startOfWeek = getPreviousSunday($today);
+
         return $currentStreakEnd < $startOfWeek;
-    } else {
-        return $currentStreakEnd < getCurrentDate($timezone);
     }
+
+    return $currentStreakEnd < getCurrentDate($timezone);
 }
