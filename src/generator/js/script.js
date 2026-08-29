@@ -49,7 +49,10 @@ const preview = {
     const params = this.getParams();
     const query = this.createQuery(params);
     const cardUrl = this.createCardUrl(query);
-    const previewUrl = query ? `preview.php?${query}` : "preview.php";
+    
+    const previewUrl = query
+  ? `/generator/preview.php?${query}`
+  : "/generator/preview.php";
 
     if (params.type === "json") {
       this.renderJsonPreview(cardUrl, previewUrl);

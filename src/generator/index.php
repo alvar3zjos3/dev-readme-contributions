@@ -105,14 +105,14 @@ function getThemeDataAttributes(array $theme): string
 
     <title><?= escapeHtml($PROJECT_NAME) ?> — Generador de estadísticas de GitHub</title>
 
-    <link rel="stylesheet" href="/demo/css/style.css?v=<?= filemtime(__DIR__ . "/css/style.css") ?>">
-    <link rel="stylesheet" href="/demo/css/toggle-dark.css?v=<?= filemtime(__DIR__ . "/css/toggle-dark.css") ?>">
+    <link rel="stylesheet" href="/generator/css/style.css?v=<?= filemtime(__DIR__ . "/css/style.css") ?>">
+    <link rel="stylesheet" href="/generator/css/toggle-dark.css?v=<?= filemtime(__DIR__ . "/css/toggle-dark.css") ?>">
 
     <!-- Iconos del sitio -->
-    <link rel="apple-touch-icon" sizes="180x180" href="/demo/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/demo/favicon-16x16.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="/demo/favicon-32x32.png">
-    <link rel="mask-icon" href="/demo/icon.svg" color="#fb8c00">
+    <link rel="apple-touch-icon" sizes="180x180" href="/generator/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/generator/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/generator/favicon-32x32.png">
+    <link rel="mask-icon" href="/generator/icon.svg" color="#fb8c00">
 
     <!-- Configuración del proyecto disponible para js/script.js -->
     <script>
@@ -126,10 +126,10 @@ function getThemeDataAttributes(array $theme): string
         ) ?>;
     </script>
 
-    <script src="/demo/js/jscolor.min.js?v=<?= filemtime(__DIR__ . "/js/jscolor.min.js") ?>" defer></script>
-    <script src="/demo/js/script.js?v=<?= filemtime(__DIR__ . "/js/script.js") ?>" defer></script>
-    <script src="/demo/js/accordion.js?v=<?= filemtime(__DIR__ . "/js/accordion.js") ?>" defer></script>
-    <script src="/demo/js/toggle-dark.js?v=<?= filemtime(__DIR__ . "/js/toggle-dark.js") ?>" defer></script>
+    <script src="/generator/js/jscolor.min.js?v=<?= filemtime(__DIR__ . "/js/jscolor.min.js") ?>" defer></script>
+    <script src="/generator/js/script.js?v=<?= filemtime(__DIR__ . "/js/script.js") ?>" defer></script>
+    <script src="/generator/js/accordion.js?v=<?= filemtime(__DIR__ . "/js/accordion.js") ?>" defer></script>
+    <script src="/generator/js/toggle-dark.js?v=<?= filemtime(__DIR__ . "/js/toggle-dark.js") ?>" defer></script>
     <script async defer src="https://buttons.github.io/buttons.js"></script>
 </head>
 
@@ -498,7 +498,7 @@ function getThemeDataAttributes(array $theme): string
                 <img
                     id="preview-image"
                     alt="Estadísticas de contribuciones de GitHub"
-                    src="/demo/preview.php?user=<?= rawurlencode($GITHUB_OWNER) ?>"
+                    src="/generator/preview.php?user=<?= rawurlencode($GITHUB_OWNER) ?>"
                     width="495"
                     height="195"
                 >
