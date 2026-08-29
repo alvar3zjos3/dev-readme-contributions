@@ -1,0 +1,31 @@
+{
+  "name": "Dev Readme Streak",
+  "description": "🔥 Genera tarjetas de rachas de contribuciones para GitHub README - Parte de dev-readme-stats",
+  "repository": "https://github.com/alvar3zjos3/dev-readme-contributions/",
+  "logo": "https://i.imgur.com/Z4bDOxC.png",
+  "keywords": ["github", "dynamic", "readme", "contributions", "streak", "stats"],
+  "addons": [],
+  "env": {
+    "TOKEN": {
+      "description": "GitHub personal access token obtained from https://github.com/settings/tokens/new",
+      "required": true
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "https://github.com/heroku/heroku-buildpack-apt"
+    },
+    {
+      "url": "https://github.com/DenverCoder1/heroku-buildpack-fonts-segoe-ui"
+    },
+    {
+      "url": "heroku/php"
+    }
+  ]
+}
